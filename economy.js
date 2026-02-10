@@ -90,6 +90,7 @@ class EconomySystem {
     // ===== UI =====
     this.createUI();
     this.refreshUI();
+    this.ensureInventoryButton();
 
     // ===== Banner Permanente: sin barra de carga (se quitó el ciclo) =====
   }
@@ -151,6 +152,85 @@ class EconomySystem {
   // =========================
   // UI
   // =========================
+  ensureInventoryButton() {
+    if (document.getElementById("inventoryBtn")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "inventoryBtn";
+    btn.className = "inv-btn";
+    btn.textContent = "Inventario";
+    btn.addEventListener("click", () => this.openInventoryModal());
+    document.body.appendChild(btn);
+  }
+
+  openInventoryModal() {
+    if (document.getElementById("inventory-modal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "inventory-modal";
+    modal.className = "inv-modal";
+    modal.innerHTML = `
+      <div class="inv-card">
+        <div class="inv-header">
+          <div class="inv-title">Inventario</div>
+          <button id="invClose" class="inv-x">✖</button>
+        </div>
+        <div id="invList" class="inv-list"></div>
+        <small class="inv-hint">Toca un item para construir.</small>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      if (modal.parentNode) modal.remove();
+    };
+
+    modal.querySelector("#invClose").onclick = close;
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) close();
+    });
+
+    this.renderInventoryIntoContainer(modal.querySelector("#invList"));
+  }
+
+  selectBuildItem(key) {
+    if (!key || !this.scene) return;
+    this.scene.selectedBuildKey = key;
+    this.scene.setBuildMode?.();
+  }
+
+  renderInventoryIntoContainer(listEl) {
+    if (!listEl) return;
+
+    const keys = Object.keys(ITEM_DEFS);
+    const rows = keys.map((k) => {
+      const def = ITEM_DEFS[k];
+      const c = this.inventory[k] || 0;
+      const disabled = c <= 0;
+      return `
+        <button class="inv-row ${disabled ? "is-empty" : ""}" data-item="${k}" ${disabled ? "disabled" : ""}>
+          <div class="inv-left">
+            <div class="inv-name">${def.icon} ${def.name}</div>
+            <div class="inv-meta">${def.size}x${def.size} • ${def.rarity}★</div>
+          </div>
+          <div class="inv-count">x ${c}</div>
+        </button>
+      `;
+    });
+
+    listEl.innerHTML = rows.join("");
+
+    listEl.querySelectorAll("[data-item]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-item");
+        if (!key) return;
+        this.selectBuildItem(key);
+        const modal = document.getElementById("inventory-modal");
+        if (modal) modal.remove();
+      });
+    });
+  }
   createUI() {
     const s = this.scene;
 
@@ -191,6 +271,7 @@ class EconomySystem {
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(10000);
+    this.expBarWidth = 140;
 
     // Deseos (perm / limited)
     this.permWishText = s.add.text(0, 12, "", style())
@@ -294,43 +375,113 @@ class EconomySystem {
 
   layoutHorizontal() {
     const s = this.scene;
-    const right = s.scale.width - 16;
-    const top = 10;
+    const w = s.scale.width;
+    const right = w - 12;
+    const isCompact = w <= 900;
+    const isTiny = w <= 720;
+    const top = isCompact ? 6 : 10;
 
-    // fila superior (derecha -> izquierda)
+    const fontSize = isTiny ? 11 : (isCompact ? 12 : 14);
+    const smallFont = isTiny ? 10 : (isCompact ? 11 : 12);
+    const padX = isTiny ? 6 : (isCompact ? 7 : 8);
+    const padY = isTiny ? 4 : (isCompact ? 5 : 6);
+
+    const apply = (el, f = fontSize, px = padX, py = padY) => {
+      if (!el) return;
+      el.setFontSize(f);
+      el.setPadding(px, py);
+    };
+
+    apply(this.goldText);
+    apply(this.levelText);
+    apply(this.permWishText);
+    apply(this.limitedWishText);
+    apply(this.gachaBtn, fontSize, padX + 2, padY);
+    apply(this.devPermBtn, smallFont, padX, Math.max(3, padY - 1));
+    apply(this.devLimitedBtn, smallFont, padX, Math.max(3, padY - 1));
+
+    this.expBarWidth = isTiny ? 100 : (isCompact ? 120 : 140);
+    this.expBarBg.width = this.expBarWidth;
+    const ratio = (this.level >= MAX_LEVEL) ? 1 : ((this.expToNext <= 0) ? 0 : (this.exp / this.expToNext));
+    this.expBarFill.width = this.expBarWidth * Phaser.Math.Clamp(ratio, 0, 1);
+
+    if (!isCompact) {
+      // fila superior (derecha -> izquierda)
+      let x = right;
+      const topRow = [
+        this.goldText,
+        this.levelText,
+        this.permWishText,
+        this.limitedWishText,
+        this.gachaBtn
+      ];
+
+      topRow.forEach((el) => {
+        el.y = top;
+        el.x = x;
+        x -= (el.width + 10);
+      });
+
+      // exp bar debajo del level
+      this.expBarBg.x = this.levelText.x;
+      this.expBarBg.y = top + 28;
+
+      // fill alineado al bg
+      this.expBarFill.x = this.expBarBg.x;
+      this.expBarFill.y = this.expBarBg.y;
+
+      // texto exp debajo
+      this.expText.x = this.levelText.x;
+      this.expText.y = top + 40;
+
+      // DEV buttons (abajo, derecha)
+      this.devLimitedBtn.x = right;
+      this.devLimitedBtn.y = top + 68;
+
+      this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 10);
+      this.devPermBtn.y = this.devLimitedBtn.y;
+      return;
+    }
+
+    // Compacto: dos filas
     let x = right;
-
-    const topRow = [
+    const row1 = [
+      this.gachaBtn,
       this.goldText,
-      this.levelText,
-      this.permWishText,
-      this.limitedWishText,
-      this.gachaBtn
+      this.levelText
     ];
-
-    topRow.forEach((el) => {
+    row1.forEach((el) => {
       el.y = top;
       el.x = x;
-      x -= (el.width + 10);
+      x -= (el.width + 8);
     });
 
-    // exp bar debajo del level
+    const expBarY = top + 22;
+    const expTextY = top + 34;
     this.expBarBg.x = this.levelText.x;
-    this.expBarBg.y = top + 28;
-
-    // fill alineado al bg
+    this.expBarBg.y = expBarY;
     this.expBarFill.x = this.expBarBg.x;
     this.expBarFill.y = this.expBarBg.y;
-
-    // texto exp debajo
     this.expText.x = this.levelText.x;
-    this.expText.y = top + 40;
+    this.expText.y = expTextY;
 
-    // DEV buttons (abajo, derecha)
+    const row2Y = top + 52;
+    x = right;
+    const row2 = [
+      this.permWishText,
+      this.limitedWishText
+    ];
+    row2.forEach((el) => {
+      el.y = row2Y;
+      el.x = x;
+      x -= (el.width + 8);
+    });
+
+    const devY = row2Y + 26;
     this.devLimitedBtn.x = right;
-    this.devLimitedBtn.y = top + 68;
+    this.devLimitedBtn.y = devY;
 
-    this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 10);
+    this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 8);
     this.devPermBtn.y = this.devLimitedBtn.y;
   }
 
@@ -347,12 +498,12 @@ class EconomySystem {
     const next = this.expToNext;
 
     if (this.level >= MAX_LEVEL) {
-      this.expBarFill.width = 140;
+      this.expBarFill.width = this.expBarWidth || 140;
       this.expText.setText(`EXP: MAX`);
     } else {
       this.expText.setText(`EXP: ${cur}/${next}`);
       const ratio = (next <= 0) ? 0 : (cur / next);
-      this.expBarFill.width = 140 * Phaser.Math.Clamp(ratio, 0, 1);
+      this.expBarFill.width = (this.expBarWidth || 140) * Phaser.Math.Clamp(ratio, 0, 1);
     }
 
     // si cambió el texto, recalcula layout (por anchos)
@@ -596,73 +747,6 @@ class EconomySystem {
       }
       .gacha-stage::before { content: none; }
       .gacha-stage::after { content: none; }
-      .gacha-backdrop {
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        overflow: hidden;
-        background-color: var(--bg-top);
-        background-image:
-          linear-gradient(color-mix(in srgb, var(--accent) 18%, rgba(255,255,255,.04)) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0,0,0,.35) 2px, transparent 2px),
-          linear-gradient(90deg, rgba(0,0,0,.35) 2px, transparent 2px);
-        background-size: 120px 60px, 120px 60px, 120px 60px;
-        background-position: 0 0, 0 0, 60px 30px;
-      }
-      .gacha-backdrop::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0), rgba(0,0,0,.35) 70%);
-        pointer-events: none;
-      }
-      .neon-frame {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%) scale(var(--s, 1));
-        width: 86%;
-        height: 62%;
-        border-radius: 10px;
-        border: 2px solid var(--neon-1);
-        box-shadow: 0 0 14px var(--neon-1), 0 0 26px var(--neon-2);
-        opacity: var(--o, .95);
-        animation: neonFlicker 3s infinite;
-        pointer-events: none;
-      }
-      .neon-frame.frame-1 { --s: 1; --o: .98; }
-      .neon-frame.frame-1::after {
-        content: "";
-        position: absolute;
-        inset: -10px;
-        border: 10px solid transparent;
-        border-image: var(--textile-img) 30 round;
-        opacity: .85;
-        pointer-events: none;
-      }
-      .neon-frame.frame-2 {
-        --s: .82;
-        --o: .92;
-        border-color: var(--neon-2);
-        box-shadow: 0 0 12px var(--neon-2), 0 0 22px var(--neon-1);
-        animation-delay: .2s;
-      }
-      .neon-frame.frame-3 { --s: .66; --o: .86; animation-delay: .4s; }
-      .neon-frame.frame-4 { --s: .52; --o: .8; border-color: var(--neon-2); animation-delay: .6s; }
-      .neon-frame.frame-5 { --s: .40; --o: .74; animation-delay: .8s; }
-      .neon-icon {
-        position: absolute;
-        font-size: 22px;
-        color: var(--accent);
-        text-shadow: 0 0 10px var(--accent), 0 0 18px var(--accent-2);
-        opacity: .95;
-        animation: neonFlicker 2.6s infinite;
-        pointer-events: none;
-      }
-      .neon-icon.i1 { top: 16px; left: 18px; }
-      .neon-icon.i2 { top: 16px; right: 18px; color: var(--accent-2); }
-      .neon-icon.i3 { bottom: 16px; left: 20px; color: var(--accent-2); }
-      .neon-icon.i4 { bottom: 16px; right: 18px; }
       .envelope {
         position: absolute;
         width: 200px;
@@ -901,6 +985,27 @@ class EconomySystem {
         z-index: 1;
       }
 
+      @media (max-width: 900px) and (orientation: landscape) {
+        .gacha-anim-window {
+          width: 96vw;
+          padding: 10px;
+        }
+        .gacha-anim-title { font-size: 16px; }
+        .gacha-anim-btn { padding: 6px 10px; font-size: 12px; }
+        .gacha-stage { height: 200px; }
+        .card-anim { width: 120px; height: 170px; }
+        .envelope { width: 160px; height: 105px; }
+        .glow { width: 200px; height: 200px; }
+        .legend-shine { width: 260px; height: 260px; }
+        .card-sigil { font-size: 30px; }
+        .card-icon { font-size: 24px; }
+        .card-back .mystery { font-size: 34px; }
+        .card-back .mystery-sub { font-size: 14px; }
+        .gacha-results { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        .result-item { padding: 8px; }
+        .result-icon { font-size: 18px; }
+      }
+
       @keyframes envOpen {
         0% { transform: rotateX(0deg); }
         100% { transform: rotateX(70deg); }
@@ -953,17 +1058,6 @@ class EconomySystem {
     const cardStyle = cardStyleParts.length ? ` style="${cardStyleParts.join(";")}"` : "";
 
     return `
-      <div class="gacha-backdrop">
-        <div class="neon-frame frame-1"></div>
-        <div class="neon-frame frame-2"></div>
-        <div class="neon-frame frame-3"></div>
-        <div class="neon-frame frame-4"></div>
-        <div class="neon-frame frame-5"></div>
-        <div class="neon-icon i1">🦙</div>
-        <div class="neon-icon i2">☀️</div>
-        <div class="neon-icon i3">🏔️</div>
-        <div class="neon-icon i4">🪶</div>
-      </div>
       <div class="envelope">
         <div class="env-body"></div>
         <div class="env-flap"></div>
@@ -1134,6 +1228,7 @@ class EconomySystem {
 
     const modal = document.createElement("div");
     modal.id = "gacha-modal";
+    modal.className = "gacha-modal";
 
     Object.assign(modal.style, {
       position: "fixed",
@@ -1169,7 +1264,7 @@ class EconomySystem {
           ">✖</button>
         </div>
 
-        <div style="margin-top:12px; display:grid; grid-template-columns: 1.15fr .85fr; gap:12px;">
+        <div class="gacha-grid" style="margin-top:12px; display:grid; grid-template-columns: 1.15fr .85fr; gap:12px;">
           <!-- Columna izquierda: banners -->
           <div style="display:grid; gap:12px;">
             <!-- Permanente -->
@@ -1324,32 +1419,8 @@ class EconomySystem {
     const list = modal.querySelector("#invList");
     if (!list) return;
 
-    const keys = Object.keys(ITEM_DEFS);
-
-    // arma filas
-    const rows = keys.map((k) => {
-      const def = ITEM_DEFS[k];
-      const c = this.inventory[k] || 0;
-      return `
-        <div style="
-          display:flex; align-items:center; justify-content:space-between; gap:10px;
-          border:1px solid rgba(255,255,255,.08);
-          border-radius:12px;
-          padding:10px;
-          background: rgba(2,6,23,.35);
-        ">
-          <div style="display:flex; flex-direction:column;">
-            <b>${def.icon} ${def.name}</b>
-            <small style="opacity:.75;">${def.size}x${def.size} • ${def.rarity}★</small>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span>x <b data-inv="${k}">${c}</b></span>
-          </div>
-        </div>
-      `;
-    });
-
-    list.innerHTML = rows.join("");
+    // reusa el render del inventario
+    this.renderInventoryIntoContainer(list);
   }
 
   updateModalCounts() {
@@ -1372,6 +1443,13 @@ class EconomySystem {
 
     // re-render de lista (para que agregue items nuevos aunque no existían)
     this.renderInventoryIntoModal();
+
+    // también actualiza inventario standalone si está abierto
+    const invModal = document.getElementById("inventory-modal");
+    if (invModal) {
+      const list = invModal.querySelector("#invList");
+      this.renderInventoryIntoContainer(list);
+    }
   }
 
   // =========================
