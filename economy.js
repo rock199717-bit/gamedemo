@@ -586,64 +586,52 @@ class EconomySystem {
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        background:
-          linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 35%, transparent), rgba(15,23,42,.25)),
-          radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 30%, transparent), rgba(15,23,42,.0) 60%);
-        border: 1px solid var(--stage-border);
+        background: transparent;
+        border: 0;
         border-radius: 14px;
         --env-anim: .55s;
         --card-anim: 1.1s;
         --glow-anim: .5s;
         --label-anim: .4s;
       }
-      .gacha-stage::before {
-        content: "";
-        position: absolute;
-        inset: 8px;
-        border-radius: 12px;
-        border: 2px solid var(--neon-1);
-        box-shadow: 0 0 12px var(--neon-1), 0 0 22px var(--neon-2);
-        opacity: .85;
-        animation: neonFlicker 2.8s infinite;
-        pointer-events: none;
-      }
+      .gacha-stage::before { content: none; }
       .gacha-stage::after { content: none; }
       .gacha-backdrop {
         position: absolute;
         inset: 0;
         z-index: 0;
         overflow: hidden;
-        background:
-          radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 20%, transparent), rgba(0,0,0,0) 60%),
-          linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 70%, rgba(2,6,23,.95) 100%);
+        background-color: var(--bg-top);
+        background-image:
+          linear-gradient(color-mix(in srgb, var(--accent) 18%, rgba(255,255,255,.04)) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0,0,0,.35) 2px, transparent 2px),
+          linear-gradient(90deg, rgba(0,0,0,.35) 2px, transparent 2px);
+        background-size: 120px 60px, 120px 60px, 120px 60px;
+        background-position: 0 0, 0 0, 60px 30px;
       }
-      .neon-frame-outer,
-      .neon-frame-inner {
+      .gacha-backdrop::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0), rgba(0,0,0,.35) 70%);
+        pointer-events: none;
+      }
+      .neon-frame {
         position: absolute;
         left: 50%;
         top: 50%;
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%) scale(var(--s, 1));
+        width: 86%;
+        height: 62%;
         border-radius: 10px;
         border: 2px solid var(--neon-1);
         box-shadow: 0 0 14px var(--neon-1), 0 0 26px var(--neon-2);
-        opacity: .95;
+        opacity: var(--o, .95);
         animation: neonFlicker 3s infinite;
         pointer-events: none;
       }
-      .neon-frame-outer {
-        width: 90%;
-        height: 70%;
-        transform: translate(-50%, -50%) rotate(-1.2deg);
-      }
-      .neon-frame-inner {
-        width: 78%;
-        height: 56%;
-        border-color: var(--neon-2);
-        box-shadow: 0 0 12px var(--neon-2), 0 0 22px var(--neon-1);
-        transform: translate(-50%, -50%) rotate(1.1deg);
-        animation-delay: .3s;
-      }
-      .neon-frame-inner::after {
+      .neon-frame.frame-1 { --s: 1; --o: .98; }
+      .neon-frame.frame-1::after {
         content: "";
         position: absolute;
         inset: -10px;
@@ -652,6 +640,16 @@ class EconomySystem {
         opacity: .85;
         pointer-events: none;
       }
+      .neon-frame.frame-2 {
+        --s: .82;
+        --o: .92;
+        border-color: var(--neon-2);
+        box-shadow: 0 0 12px var(--neon-2), 0 0 22px var(--neon-1);
+        animation-delay: .2s;
+      }
+      .neon-frame.frame-3 { --s: .66; --o: .86; animation-delay: .4s; }
+      .neon-frame.frame-4 { --s: .52; --o: .8; border-color: var(--neon-2); animation-delay: .6s; }
+      .neon-frame.frame-5 { --s: .40; --o: .74; animation-delay: .8s; }
       .neon-icon {
         position: absolute;
         font-size: 22px;
@@ -661,22 +659,10 @@ class EconomySystem {
         animation: neonFlicker 2.6s infinite;
         pointer-events: none;
       }
-      .neon-icon.i1 { top: 22px; left: 26px; }
-      .neon-icon.i2 { top: 22px; right: 28px; color: var(--accent-2); }
-      .neon-icon.i3 { bottom: 22px; left: 30px; color: var(--accent-2); }
-      .neon-icon.i4 { bottom: 20px; right: 26px; }
-      .neon-wave {
-        position: absolute;
-        width: 34px;
-        height: 6px;
-        border-top: 2px solid var(--neon-1);
-        border-radius: 12px;
-        box-shadow: 0 0 10px var(--neon-1);
-        opacity: .8;
-        animation: neonFlicker 2.8s infinite;
-      }
-      .neon-wave.w1 { top: 42px; left: 50%; transform: translateX(-50%); }
-      .neon-wave.w2 { bottom: 46px; right: 40%; }
+      .neon-icon.i1 { top: 16px; left: 18px; }
+      .neon-icon.i2 { top: 16px; right: 18px; color: var(--accent-2); }
+      .neon-icon.i3 { bottom: 16px; left: 20px; color: var(--accent-2); }
+      .neon-icon.i4 { bottom: 16px; right: 18px; }
       .envelope {
         position: absolute;
         width: 200px;
@@ -968,14 +954,15 @@ class EconomySystem {
 
     return `
       <div class="gacha-backdrop">
-        <div class="neon-frame-outer"></div>
-        <div class="neon-frame-inner"></div>
+        <div class="neon-frame frame-1"></div>
+        <div class="neon-frame frame-2"></div>
+        <div class="neon-frame frame-3"></div>
+        <div class="neon-frame frame-4"></div>
+        <div class="neon-frame frame-5"></div>
         <div class="neon-icon i1">🦙</div>
         <div class="neon-icon i2">☀️</div>
         <div class="neon-icon i3">🏔️</div>
-        <div class="neon-icon i4">🌽</div>
-        <div class="neon-wave w1"></div>
-        <div class="neon-wave w2"></div>
+        <div class="neon-icon i4">🪶</div>
       </div>
       <div class="envelope">
         <div class="env-body"></div>
