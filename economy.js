@@ -613,62 +613,70 @@ class EconomySystem {
         inset: 0;
         z-index: 0;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background:
-          radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 25%, transparent), rgba(0,0,0,0) 60%),
+          radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 20%, transparent), rgba(0,0,0,0) 60%),
           linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 70%, rgba(2,6,23,.95) 100%);
       }
-      .tunnel {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .tunnel-frame {
+      .neon-frame-outer,
+      .neon-frame-inner {
         position: absolute;
         left: 50%;
         top: 50%;
-        width: 86%;
-        height: 58%;
-        transform: translate(-50%, -50%) scale(var(--s, 1));
+        transform: translate(-50%, -50%);
+        border-radius: 10px;
         border: 2px solid var(--neon-1);
-        box-shadow:
-          0 0 12px var(--neon-1),
-          0 0 24px var(--neon-2),
-          inset 0 0 10px var(--neon-1);
-        border-radius: 8px;
-        opacity: var(--o, .95);
+        box-shadow: 0 0 14px var(--neon-1), 0 0 26px var(--neon-2);
+        opacity: .95;
         animation: neonFlicker 3s infinite;
+        pointer-events: none;
       }
-      .tunnel-frame::after {
+      .neon-frame-outer {
+        width: 90%;
+        height: 70%;
+        transform: translate(-50%, -50%) rotate(-1.2deg);
+      }
+      .neon-frame-inner {
+        width: 78%;
+        height: 56%;
+        border-color: var(--neon-2);
+        box-shadow: 0 0 12px var(--neon-2), 0 0 22px var(--neon-1);
+        transform: translate(-50%, -50%) rotate(1.1deg);
+        animation-delay: .3s;
+      }
+      .neon-frame-inner::after {
         content: "";
         position: absolute;
         inset: -10px;
         border: 10px solid transparent;
         border-image: var(--textile-img) 30 round;
         opacity: .85;
+        pointer-events: none;
       }
-      .tunnel-frame.f1 { --s: 1; --o: .95; }
-      .tunnel-frame.f2 { --s: .82; --o: .9;  animation-delay: .2s; }
-      .tunnel-frame.f3 { --s: .66; --o: .85; animation-delay: .4s; }
-      .tunnel-frame.f4 { --s: .52; --o: .8;  animation-delay: .6s; }
-      .tunnel-frame.f5 { --s: .40; --o: .75; animation-delay: .8s; }
-      .tunnel-frame.f6 { --s: .30; --o: .7;  animation-delay: 1s; }
-      .tunnel-frame.f7 { --s: .22; --o: .65; animation-delay: 1.2s; }
-      .tunnel-floor {
+      .neon-icon {
         position: absolute;
-        bottom: -6%;
-        left: 50%;
-        width: 78%;
-        height: 120%;
-        transform: translateX(-50%);
-        background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 35%, transparent) 0%, rgba(20,10,35,.75) 60%, rgba(2,6,23,.95) 100%);
-        clip-path: polygon(50% 0%, 86% 100%, 14% 100%);
-        opacity: .9;
+        font-size: 22px;
+        color: var(--accent);
+        text-shadow: 0 0 10px var(--accent), 0 0 18px var(--accent-2);
+        opacity: .95;
+        animation: neonFlicker 2.6s infinite;
+        pointer-events: none;
       }
+      .neon-icon.i1 { top: 22px; left: 26px; }
+      .neon-icon.i2 { top: 22px; right: 28px; color: var(--accent-2); }
+      .neon-icon.i3 { bottom: 22px; left: 30px; color: var(--accent-2); }
+      .neon-icon.i4 { bottom: 20px; right: 26px; }
+      .neon-wave {
+        position: absolute;
+        width: 34px;
+        height: 6px;
+        border-top: 2px solid var(--neon-1);
+        border-radius: 12px;
+        box-shadow: 0 0 10px var(--neon-1);
+        opacity: .8;
+        animation: neonFlicker 2.8s infinite;
+      }
+      .neon-wave.w1 { top: 42px; left: 50%; transform: translateX(-50%); }
+      .neon-wave.w2 { bottom: 46px; right: 40%; }
       .envelope {
         position: absolute;
         width: 200px;
@@ -960,16 +968,14 @@ class EconomySystem {
 
     return `
       <div class="gacha-backdrop">
-        <div class="tunnel">
-          <div class="tunnel-frame f1"></div>
-          <div class="tunnel-frame f2"></div>
-          <div class="tunnel-frame f3"></div>
-          <div class="tunnel-frame f4"></div>
-          <div class="tunnel-frame f5"></div>
-          <div class="tunnel-frame f6"></div>
-          <div class="tunnel-frame f7"></div>
-          <div class="tunnel-floor"></div>
-        </div>
+        <div class="neon-frame-outer"></div>
+        <div class="neon-frame-inner"></div>
+        <div class="neon-icon i1">🦙</div>
+        <div class="neon-icon i2">☀️</div>
+        <div class="neon-icon i3">🏔️</div>
+        <div class="neon-icon i4">🌽</div>
+        <div class="neon-wave w1"></div>
+        <div class="neon-wave w2"></div>
       </div>
       <div class="envelope">
         <div class="env-body"></div>
