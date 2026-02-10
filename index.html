@@ -5,11 +5,50 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Iso City Builder Test</title>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./economy.css">
 </head>
 <body>
   <div id="game"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+  <script src="./economy.js"></script>
   <script src="./main.js"></script>
 </body>
+<!-- ===== GACHA MODAL (UI encima del juego) ===== -->
+<div id="gachaModal" class="gacha-modal" style="display:none;">
+  <div class="gacha-card">
+    <div class="gacha-header">
+      <div class="gacha-title">Gachapon</div>
+      <button id="gachaClose" class="gacha-x">✖</button>
+    </div>
+
+    <div class="gacha-tabs">
+      <button id="tabPermanent" class="gacha-tab active">Permanente</button>
+      <button id="tabLimited" class="gacha-tab">Tiempo Limitado</button>
+    </div>
+
+    <div id="bannerPermanent" class="gacha-banner">
+      <div class="gacha-banner-title">Banner Permanente</div>
+      <div class="gacha-banner-desc">Usa 🎟 Deseos Permanentes</div>
+
+      <div class="gacha-actions">
+        <button id="rollPermanent1" class="gacha-btn">Tirar x1</button>
+        <button id="rollPermanent10" class="gacha-btn">Tirar x10</button>
+      </div>
+    </div>
+
+    <div id="bannerLimited" class="gacha-banner" style="display:none;">
+      <div class="gacha-banner-title">Banner Limitado</div>
+      <div class="gacha-banner-desc">Usa ✨ Deseos Limitados</div>
+
+      <div class="gacha-actions">
+        <button id="rollLimited1" class="gacha-btn">Tirar x1</button>
+        <button id="rollLimited10" class="gacha-btn">Tirar x10</button>
+      </div>
+    </div>
+
+    <div id="gachaLog" class="gacha-log">Listo.</div>
+  </div>
+</div>
+
 </html>

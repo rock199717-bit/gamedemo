@@ -7,6 +7,121 @@ const MAP_H = 140;
 const TILE_W = 64;
 const TILE_H = 32;
 
+// =========================
+// BUILDING TYPES (WORLD)
+// =========================
+const BUILDING_TYPES = {
+  // ✅ verdes básicos (lo que ya tenías “de prueba”)
+  green_1: {
+    key: "green_1",
+    label: "Verde 1x1",
+    size: 1,
+    fill: 0x22c55e,
+    border: 0x22c55e,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 },
+    glow: false
+  },
+
+  // ✅ PERMANENTE 4★ (los 3 cuadrados principales)
+  perm_blue_9: {
+    key: "perm_blue_9",
+    label: "Azul 9x9",
+    size: 9,
+    fill: 0x3b82f6,
+    border: 0x60a5fa,
+    buildSeconds: 20,
+    prodSeconds: 60,
+    reward: { exp: 20, gold: 100 },
+    glow: false
+  },
+  perm_red_1: {
+    key: "perm_red_1",
+    label: "Rojo 1x1",
+    size: 1,
+    fill: 0xef4444,
+    border: 0xf87171,
+    buildSeconds: 20,
+    prodSeconds: 60,
+    reward: { exp: 20, gold: 100 },
+    glow: false
+  },
+  perm_yellow_4: {
+    key: "perm_yellow_4",
+    label: "Amarillo 4x4",
+    size: 4,
+    fill: 0xfacc15,
+    border: 0xfde047,
+    buildSeconds: 20,
+    prodSeconds: 60,
+    reward: { exp: 20, gold: 100 },
+    glow: false
+  },
+
+  // ✅ VERDE 9x9 (5★ permanente)
+  perm_green_9: {
+    key: "perm_green_9",
+    label: "Verde 9x9",
+    size: 9,
+    fill: 0x16a34a,
+    border: 0x22c55e,
+    buildSeconds: 120,     // 2 min
+    prodSeconds: 60,       // produce cada 1 min
+    reward: { exp: 10, gold: 150 },
+    glow: false
+  },
+
+  // ✅ LIMITADO 4★ (2x2) — recompensas NO las especificaste
+  // Por ahora las dejo iguales que el verde básico para que funcione y luego ajustamos.
+  lim_blue_2: {
+    key: "lim_blue_2",
+    label: "Azul 2x2",
+    size: 2,
+    fill: 0x3b82f6,
+    border: 0x60a5fa,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 }, // TODO: ajustar si quieres
+    glow: false
+  },
+  lim_red_2: {
+    key: "lim_red_2",
+    label: "Rojo 2x2",
+    size: 2,
+    fill: 0xef4444,
+    border: 0xf87171,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 }, // TODO
+    glow: false
+  },
+  lim_yellow_2: {
+    key: "lim_yellow_2",
+    label: "Amarillo 2x2",
+    size: 2,
+    fill: 0xfacc15,
+    border: 0xfde047,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 }, // TODO
+    glow: false
+  },
+
+  // ✅ DORADO 5★ (limitado) con brillo
+  lim_gold_2: {
+    key: "lim_gold_2",
+    label: "Dorado 2x2",
+    size: 2,
+    fill: 0xfbbf24,
+    border: 0xf59e0b,
+    buildSeconds: 300,     // 5 min
+    prodSeconds: 60,
+    reward: { exp: 35, gold: 300 },
+    glow: true
+  }
+};
+
 // 0 = libre, >0 = id edificio
 const grid = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
 let nextBuildingId = 1;
@@ -102,6 +217,7 @@ function screenToIsoTile(mx, my) {
 // =========================
 class MainScene extends Phaser.Scene {
   create() {
+    
     // ===== CAMERAS =====
     // Main camera = WORLD (se zoom/pan)
     this.worldCam = this.cameras.main;
@@ -143,6 +259,8 @@ class MainScene extends Phaser.Scene {
     this.pending = null;
     this.selectedBuildingId = null;
     this.moveMode = null;
+    // ✅ item seleccionado para construir (por defecto el verde 1x1)
+    this.selectedBuildKey = "green_1";
 
     // lista de objetos UI para que el WORLD cam los ignore (así NO se mueven con zoom)
     this.uiObjects = [];
@@ -179,12 +297,14 @@ class MainScene extends Phaser.Scene {
     // crea botones UI (los registra adentro)
     this.createSizeButtons(regUI);
     this.createCancelBuildButton(regUI);
+    this.createCancelSelectButton(regUI);
     this.createConfirmButtons(regUI);
     this.createActionButtons(regUI);
 
     // ✅ IMPORTANTÍSIMO:
     // el WORLD cam ignora todos los UI -> el UI no se escala con zoom
     this.worldCam.ignore(this.uiObjects);
+    this.economy = new EconomySystem(this);
 
     // ===== Cámara / bounds =====
     this.setupCameraBounds();
@@ -336,9 +456,24 @@ class MainScene extends Phaser.Scene {
       this.lastZoom = cam.zoom;
       this.drawGridVisible();
     }
+    // ✅ FIX: actualizar ghost SIEMPRE en moveMode (aunque no haya pointermove)
+    if (this.moveMode) {
+      const p = this.input.activePointer;
+
+      // si estás arriba del UI, oculta el ghost
+      if (p.y <= 140) {
+        this.moveGhost.clear();
+      } else {
+        const tile = screenToIsoTile(p.worldX, p.worldY);
+        this.renderMoveGhost(tile);
+      }
+    }
 
     if (this.pending) this.updateConfirmButtonsPosition();
     if (this.selectedBuildingId) this.updateActionButtonsPosition();
+
+    // ✅ AQUI:
+    this.updateBuildingsTimers();
   }
 
   // ================= ZOOM =================
@@ -536,6 +671,34 @@ class MainScene extends Phaser.Scene {
     });
   }
 
+  createCancelSelectButton(regUI) {
+    const style = { fontFamily: "Arial", fontSize: "14px", color: "#f59e0b", backgroundColor: "#020617" };
+
+    this.cancelSelectBtn = regUI(
+      this.add.text(390, 86, "Cancelar", style)
+        .setPadding(10, 6, 10, 6)
+        .setInteractive({ useHandCursor: true })
+        .setScrollFactor(0)
+        .setVisible(false)
+        .setDepth(9999)
+    );
+
+    this.cancelSelectBorder = regUI(this.add.graphics().setScrollFactor(0).setVisible(false).setDepth(9998));
+
+    const draw = () => {
+      this.cancelSelectBorder.clear();
+      this.cancelSelectBorder.lineStyle(1, 0xf59e0b, 1);
+      this.cancelSelectBorder.strokeRoundedRect(388, 84, this.cancelSelectBtn.width + 4, this.cancelSelectBtn.height + 4, 8);
+    };
+    draw();
+
+    this.cancelSelectBtn.on("pointerdown", (pointer) => {
+      this.uiGuard(pointer);
+      this.closeBuildingMenu();
+      this.setCursorMode();
+    });
+  }
+
   // ===== Confirm (✔ ✖) =====
   createConfirmButtons(regUI) {
     const okStyle = { fontFamily: "Arial", fontSize: "18px", color: "#022c22", backgroundColor: "#22c55e" };
@@ -631,7 +794,6 @@ class MainScene extends Phaser.Scene {
   createActionButtons(regUI) {
     const baseStyle   = { fontFamily: "Arial", fontSize: "18px", color: "#e5e7eb", backgroundColor: "#020617" };
     const dangerStyle = { fontFamily: "Arial", fontSize: "18px", color: "#f87171", backgroundColor: "#020617" };
-    const closeStyle  = { fontFamily: "Arial", fontSize: "18px", color: "#22c55e", backgroundColor: "#020617" };
 
     this.actRotate = regUI(
       this.add.text(0, 0, "⟲", baseStyle)
@@ -651,29 +813,15 @@ class MainScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true }).setVisible(false).setDepth(9999)
     );
 
-    this.actClose = regUI(
-      this.add.text(0, 0, "✖", closeStyle)
-        .setPadding(10, 6, 10, 6).setScrollFactor(0)
-        .setInteractive({ useHandCursor: true }).setVisible(false).setDepth(9999)
-    );
-
     this.attachOverUI(this.actRotate);
     this.attachOverUI(this.actMove);
     this.attachOverUI(this.actTrash);
-    this.attachOverUI(this.actClose);
 
     this.actRotate.on("pointerdown", (pointer) => { this.uiGuard(pointer); this.rotateSelected(); });
-    this.actMove.on("pointerdown", (pointer) => { this.uiGuard(pointer); this.startMoveSelected(); this.hideActionButtons(); });
+    this.actMove.on("pointerdown", (pointer) => { this.uiGuard(pointer); this.startMoveSelected(); this.closeBuildingMenu(); });
     this.actTrash.on("pointerdown", (pointer) => {
       this.uiGuard(pointer);
       this.destroySelected();
-      this.hideActionButtons();
-      this.closeBuildingMenu();
-      this.setCursorMode();
-    });
-    this.actClose.on("pointerdown", (pointer) => {
-      this.uiGuard(pointer);
-      this.hideActionButtons();
       this.closeBuildingMenu();
       this.setCursorMode();
     });
@@ -688,14 +836,12 @@ class MainScene extends Phaser.Scene {
     this.actRotate.setVisible(true);
     this.actMove.setVisible(true);
     this.actTrash.setVisible(true);
-    this.actClose.setVisible(true);
   }
 
   hideActionButtons() {
     this.actRotate.setVisible(false);
     this.actMove.setVisible(false);
     this.actTrash.setVisible(false);
-    this.actClose.setVisible(false);
     this.overUI = false;
   }
 
@@ -709,14 +855,14 @@ class MainScene extends Phaser.Scene {
     const y = this.actionClickY ?? 0;
     
 
-    const oy = - 60;
-    this.actRotate.setPosition(x - 70, y + oy);
-    this.actMove.setPosition(x - 20, y + oy);
-    this.actTrash.setPosition(x + 30, y + oy)
-    this.actClose.setPosition(x + 80, y + oy);
+    const oy = -60;
+    this.actRotate.setPosition(x - 50, y + oy);
+    this.actMove.setPosition(x, y + oy);
+    this.actTrash.setPosition(x + 50, y + oy);
   }
 
   openBuildingMenu(idOnTile, pointer) {
+    this.closeBuildingMenu();
     this.clearPending();
     this.ghost.clear();
 
@@ -725,8 +871,9 @@ class MainScene extends Phaser.Scene {
     this.actionClickX = pointer.x;
     this.actionClickY = pointer.y;
 
-    this.showActionButtons();
-    this.updateActionButtonsPosition();
+    this.openBuildingInfoModal(idOnTile);
+    this.cancelSelectBtn.setVisible(true);
+    this.cancelSelectBorder.setVisible(true);
 
     mode = "cursor";
     this.modeText.setText(this.modeLabel());
@@ -737,6 +884,281 @@ class MainScene extends Phaser.Scene {
   closeBuildingMenu() {
     this.selectedBuildingId = null;
     this.hideActionButtons();
+    this.cancelSelectBtn?.setVisible(false);
+    this.cancelSelectBorder?.setVisible(false);
+    this.closeBuildingInfoModal();
+  }
+
+  getRarityForKey(typeKey) {
+    if (typeKey === "green_1") return 2;
+    if (typeKey === "perm_green_9" || typeKey === "lim_gold_2") return 5;
+    if (typeof typeKey === "string" && (typeKey.startsWith("perm_") || typeKey.startsWith("lim_"))) return 4;
+    return 2;
+  }
+
+  formatSeconds(s) {
+    const total = Math.max(0, Math.floor(s || 0));
+    if (total >= 60) {
+      const m = Math.floor(total / 60);
+      const r = total % 60;
+      return r ? `${m}m ${r}s` : `${m}m`;
+    }
+    return `${total}s`;
+  }
+
+  colorToHex(n) {
+    const v = Number(n) >>> 0;
+    return `#${v.toString(16).padStart(6, "0")}`;
+  }
+
+  openBuildingInfoModal(id) {
+    this.closeBuildingInfoModal();
+
+    const b = buildings.get(id);
+    if (!b) return;
+
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+    const rarity = this.getRarityForKey(def.key || b.typeKey);
+    const stars = "★".repeat(rarity);
+    const baseLabel = def.label || def.key;
+    const displayLabel = (b.typeKey === "green_1" && b.size !== def.size)
+      ? `Verde ${b.size}x${b.size}`
+      : baseLabel;
+    const buildLabel = this.formatSeconds(def.buildSeconds);
+    const prodLabel = this.formatSeconds(def.prodSeconds);
+    const rewardGold = def.reward?.gold ?? 0;
+    const rewardExp = def.reward?.exp ?? 0;
+    const fillHex = this.colorToHex(def.fill);
+    const borderHex = this.colorToHex(def.border);
+    const previewSvg = `
+      <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="60,8 112,40 60,72 8,40" fill="${fillHex}" stroke="${borderHex}" stroke-width="3"/>
+      </svg>
+    `;
+
+    const modal = document.createElement("div");
+    modal.id = "building-modal";
+    Object.assign(modal.style, {
+      position: "fixed",
+      inset: "0",
+      background: "rgba(0,0,0,0.55)",
+      zIndex: "999998",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "auto"
+    });
+
+    modal.innerHTML = `
+      <div class="building-window" style="
+        width: min(520px, 94vw);
+        background: #0b1222;
+        color: #e5e7eb;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.5);
+        font-family: Arial;
+        transform: translateY(12px) scale(.98);
+        opacity: 0;
+        transition: transform .18s ease, opacity .18s ease;
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <h2 style="margin:0;font-size:18px;">🏠 ${displayLabel}</h2>
+          <button id="buildingClose" style="
+            background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);
+            padding:8px 10px;border-radius:10px;cursor:pointer;
+          ">✖</button>
+        </div>
+
+        <div style="margin-top:10px; display:grid; gap:8px; font-size:14px;">
+          <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="
+              width:140px;height:90px;display:flex;align-items:center;justify-content:center;
+              background:#0f172a;border:1px solid rgba(255,255,255,.08);border-radius:12px;
+            ">${previewSvg}</div>
+            <div style="display:grid; gap:6px;">
+              <div>Rareza: <b>${stars}</b></div>
+              <div>Tamaño: <b>${b.size}x${b.size}</b></div>
+            </div>
+          </div>
+          <div>Construcción: <b>${buildLabel}</b></div>
+          <div>Producción: <b>${prodLabel}</b></div>
+          <div>Recompensa: <b>+${rewardGold} Oro</b> · <b>+${rewardExp} EXP</b></div>
+        </div>
+
+        <div id="buildSection" style="margin-top:12px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; opacity:.85;">
+            <span>Construcción</span>
+            <span id="buildTime">—</span>
+          </div>
+          <div style="margin-top:6px; height:10px; background:#1e293b; border-radius:999px; overflow:hidden;">
+            <div id="buildFill" style="height:100%; width:0%; background:#fbbf24;"></div>
+          </div>
+        </div>
+
+        <div id="prodSection" style="margin-top:12px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; opacity:.85;">
+            <span>Producción</span>
+            <span id="prodTime">—</span>
+          </div>
+          <div style="margin-top:6px; height:10px; background:#1e293b; border-radius:999px; overflow:hidden;">
+            <div id="prodFill" style="height:100%; width:0%; background:#22c55e;"></div>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="bldCollect" style="
+              background:#22c55e;color:#022c22;border:none;
+              padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+            ">Recolectar</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button id="bldMove" style="
+            background:#22c55e;color:#022c22;border:none;
+            padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+          ">Mover</button>
+          <button id="bldRotate" style="
+            background:#38bdf8;color:#022c22;border:none;
+            padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+          ">Girar</button>
+          <button id="bldDelete" style="
+            background:#ef4444;color:#fff;border:none;
+            padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+          ">Eliminar</button>
+        </div>
+
+        <small style="opacity:.75; display:block; margin-top:10px;">
+          Toca 💰 / ⭐ sobre el edificio para recolectar.
+        </small>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    requestAnimationFrame(() => {
+      const win = modal.querySelector(".building-window");
+      if (!win) return;
+      win.style.opacity = "1";
+      win.style.transform = "translateY(0) scale(1)";
+    });
+
+    const close = () => {
+      const win = modal.querySelector(".building-window");
+      if (win) {
+        win.style.opacity = "0";
+        win.style.transform = "translateY(12px) scale(.98)";
+        setTimeout(() => {
+          if (modal.parentNode) modal.remove();
+        }, 180);
+      } else if (modal.parentNode) {
+        modal.remove();
+      }
+
+      this.selectedBuildingId = null;
+      this.hideActionButtons();
+      this.cancelSelectBtn?.setVisible(false);
+      this.cancelSelectBorder?.setVisible(false);
+      this.setCursorMode();
+    };
+
+    const closeBtn = modal.querySelector("#buildingClose");
+    if (closeBtn) closeBtn.onclick = close;
+
+    const collectBtn = modal.querySelector("#bldCollect");
+    if (collectBtn) collectBtn.onclick = () => {
+      this.collectBuildingReward(id);
+      this.updateBuildingInfoModal(b, def, Date.now());
+    };
+
+    const moveBtn = modal.querySelector("#bldMove");
+    if (moveBtn) moveBtn.onclick = () => {
+      this.closeBuildingInfoModal();
+      this.startMoveSelected();
+      this.cancelSelectBtn?.setVisible(false);
+      this.cancelSelectBorder?.setVisible(false);
+    };
+
+    const rotateBtn = modal.querySelector("#bldRotate");
+    if (rotateBtn) rotateBtn.onclick = () => {
+      this.closeBuildingInfoModal();
+      this.rotateSelected();
+      this.closeBuildingMenu();
+      this.setCursorMode();
+    };
+
+    const deleteBtn = modal.querySelector("#bldDelete");
+    if (deleteBtn) deleteBtn.onclick = () => {
+      this.closeBuildingInfoModal();
+      this.destroySelected();
+      this.closeBuildingMenu();
+      this.setCursorMode();
+    };
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) close();
+    });
+
+    this.updateBuildingInfoModal(b, def, Date.now());
+  }
+
+  closeBuildingInfoModal() {
+    const modal = document.getElementById("building-modal");
+    if (modal) modal.remove();
+  }
+
+  updateBuildingInfoModal(b, def, now) {
+    const modal = document.getElementById("building-modal");
+    if (!modal || !b || this.selectedBuildingId !== b.id) return;
+
+    const buildSection = modal.querySelector("#buildSection");
+    const prodSection = modal.querySelector("#prodSection");
+    const buildFill = modal.querySelector("#buildFill");
+    const prodFill = modal.querySelector("#prodFill");
+    const buildTime = modal.querySelector("#buildTime");
+    const prodTime = modal.querySelector("#prodTime");
+    const collectBtn = modal.querySelector("#bldCollect");
+
+    if (!b.isBuilt) {
+      if (buildSection) buildSection.style.display = "block";
+      if (prodSection) prodSection.style.display = "none";
+
+      const total = def.buildSeconds * 1000;
+      const remain = Math.max(0, b.buildEnd - now);
+      const done = total > 0 ? (1 - (remain / total)) : 1;
+
+      if (buildFill) buildFill.style.width = `${Math.floor(Phaser.Math.Clamp(done, 0, 1) * 100)}%`;
+      if (buildTime) buildTime.textContent = `${this.formatSeconds(Math.ceil(remain / 1000))} restante`;
+      if (collectBtn) collectBtn.setAttribute("disabled", "true");
+      return;
+    }
+
+    if (buildSection) buildSection.style.display = "none";
+    if (prodSection) prodSection.style.display = "block";
+
+    const cycle = b.prodCycle;
+    let p01 = 1;
+    let remain = 0;
+    if (!b.rewardReady) {
+      const elapsed = now - b.prodStart;
+      if (cycle > 0) {
+        p01 = Phaser.Math.Clamp(elapsed / cycle, 0, 1);
+        remain = Math.max(0, cycle - elapsed);
+      }
+    }
+
+    if (prodFill) prodFill.style.width = `${Math.floor(Phaser.Math.Clamp(p01, 0, 1) * 100)}%`;
+    if (prodTime) {
+      prodTime.textContent = b.rewardReady ? "Listo" : `${this.formatSeconds(Math.ceil(remain / 1000))} restante`;
+    }
+
+    if (collectBtn) {
+      if (b.rewardReady) {
+        collectBtn.removeAttribute("disabled");
+      } else {
+        collectBtn.setAttribute("disabled", "true");
+      }
+    }
   }
 
   rotateSelected() {
@@ -847,22 +1269,145 @@ class MainScene extends Phaser.Scene {
   destroyBuilding(id) {
     const b = buildings.get(id);
     if (!b) return;
+
+    // ✅ devolver item al inventario (si no es el verde base)
+    if (this.economy && b.typeKey && b.typeKey !== "green_1") {
+      this.economy.addItem?.(b.typeKey, 1);
+    }
+
     b.gfx.destroy();
+    b.buildBar?.destroy();
+    b.prodBar?.destroy();
+    b.glowGfx?.destroy();
+    b.rewardGoldIcon?.destroy();
+    b.rewardExpIcon?.destroy();
     buildings.delete(id);
     freeBuilding(id);
   }
 
-  placeBuilding(r0, c0, size) {
+  collectBuildingReward(id) {
+    const b = buildings.get(id);
+    if (!b || !b.rewardReady) return;
+
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+    const reward = def.reward || { exp: 0, gold: 0 };
+
+    if (this.economy) {
+      this.economy.addGold(reward.gold);
+      this.economy.addExp(reward.exp);
+    }
+
+    b.rewardReady = false;
+    b.prodStart = Date.now();
+    b.rewardGoldIcon?.setVisible(false);
+    b.rewardExpIcon?.setVisible(false);
+  }
+
+  placeBuilding(r0, c0, sizeIgnored) {
+    // 👇 construir usando el item seleccionado
+    const typeKey = this.selectedBuildKey || "green_1";
+    const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
+
+    const size = (typeKey === "green_1" && typeof sizeIgnored === "number" && sizeIgnored > 0)
+      ? sizeIgnored
+      : def.size;
+
+    // validar espacio
+    if (!canPlace(size, r0, c0)) return;
+
+    // ✅ si no es el verde básico, debe existir en inventario y se consume
+    // (si quieres que verde también consuma, lo cambiamos luego)
+    if (this.economy && typeKey !== "green_1") {
+      const ok = this.economy.consumeItem(typeKey, 1);
+      if (!ok) {
+        console.log("No tienes ese item en inventario:", typeKey);
+        return;
+      }
+    }
+
     const id = nextBuildingId++;
     const cells = occupy(id, size, r0, c0);
 
+    // base gfx (tiles)
     const gfx = this.add.graphics();
-    this.drawCells(gfx, cells, 0x22c55e, 0.85, 0x22c55e);
+    const isInstant = def.buildSeconds <= 0;
+    const ghostAlpha = isInstant ? 0.85 : 0.25;
+    const ghostBorder = isInstant ? def.border : 0x64748b;
+    this.drawCells(gfx, cells, def.fill, ghostAlpha, ghostBorder);
 
-    // ✅ el UI cam NO debe renderizar edificios
+    // ✅ UI cam NO renderiza edificios
     this.uiCam.ignore(gfx);
 
-    buildings.set(id, { size, cells, gfx, rotationStep: 0, border: 0x22c55e });
+    // ===== barras en mundo =====
+    const buildBar = this.add.graphics();
+    const prodBar = this.add.graphics();
+    this.uiCam.ignore([buildBar, prodBar]);
+
+    // ===== iconos de recompensa (manual) =====
+    const rewardGoldIcon = this.add.text(0, 0, "💰", {
+      fontFamily: "Arial",
+      fontSize: "22px",
+      color: "#fbbf24",
+      backgroundColor: "#0b1222"
+    })
+      .setOrigin(0.5, 0.5)
+      .setPadding(6, 4, 6, 4)
+      .setDepth(60)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    const rewardExpIcon = this.add.text(0, 0, "⭐", {
+      fontFamily: "Arial",
+      fontSize: "22px",
+      color: "#22c55e",
+      backgroundColor: "#0b1222"
+    })
+      .setOrigin(0.5, 0.5)
+      .setPadding(6, 4, 6, 4)
+      .setDepth(60)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    this.uiCam.ignore([rewardGoldIcon, rewardExpIcon]);
+
+    const onCollect = (pointer) => {
+      this.uiGuard(pointer);
+      this.collectBuildingReward(id);
+    };
+    rewardGoldIcon.on("pointerdown", onCollect);
+    rewardExpIcon.on("pointerdown", onCollect);
+
+    // glow (para dorado)
+    let glowGfx = null;
+    if (def.glow) {
+      glowGfx = this.add.graphics();
+      this.uiCam.ignore(glowGfx);
+    }
+
+    // tiempos
+    const now = Date.now();
+    const buildEnd = now + def.buildSeconds * 1000;
+    const prodCycle = def.prodSeconds * 1000;
+
+    buildings.set(id, {
+      id,
+      typeKey,
+      size,
+      cells,
+      gfx,
+      buildBar,
+      prodBar,
+      rewardGoldIcon,
+      rewardExpIcon,
+      rewardReady: false,
+      glowGfx,
+      isBuilt: def.buildSeconds <= 0,
+      buildEnd,
+      prodCycle,
+      prodStart: def.buildSeconds <= 0 ? now : buildEnd, // empieza cuando termina de construir
+      lastRewardAt: 0,
+      border: def.border
+    });
   }
 
   getBuildingAnchor(b) {
@@ -948,6 +1493,115 @@ class MainScene extends Phaser.Scene {
         this.drawDiamond(this.gridGfx, p.x, p.y, TILE_W, TILE_H, 0x020617, 1);
         this.outlineDiamond(this.gridGfx, p.x, p.y, TILE_W, TILE_H);
       }
+    }
+  }
+
+  updateBuildingsTimers() {
+    const now = Date.now();
+
+    for (const b of buildings.values()) {
+      const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+
+      // encontrar un punto “anchor” (top-left)
+      const topLeft = b.cells.reduce((best, cur) => {
+        if (!best) return cur;
+        return (cur.r + cur.c) < (best.r + best.c) ? cur : best;
+      }, null);
+
+      const p = isoToScreen(topLeft.r, topLeft.c);
+
+      // posición barra (un poquito arriba del edificio)
+      const barX = p.x;
+      const barY = p.y - (TILE_H * 0.9);
+
+      // ===== Construcción =====
+      if (!b.isBuilt) {
+        const total = def.buildSeconds * 1000;
+        const remain = Math.max(0, b.buildEnd - now);
+        const done = 1 - (remain / total);
+
+        // dibujar barra construcción
+        b.buildBar.clear();
+        b.prodBar.clear();
+        b.rewardGoldIcon?.setVisible(false);
+        b.rewardExpIcon?.setVisible(false);
+
+        // fondo
+        b.buildBar.fillStyle(0x0b1222, 0.8);
+        b.buildBar.fillRoundedRect(barX - 34, barY, 68, 8, 4);
+
+        // progreso
+        b.buildBar.fillStyle(0xfbbf24, 1);
+        b.buildBar.fillRoundedRect(barX - 34, barY, 68 * Phaser.Math.Clamp(done, 0, 1), 8, 4);
+
+        // listo
+        if (remain <= 0) {
+          b.isBuilt = true;
+          b.prodStart = now; // empieza producción
+          b.rewardReady = false;
+          b.buildBar.clear();
+          // reemplaza ghost por edificio final
+          b.gfx.clear();
+          this.drawCells(b.gfx, b.cells, def.fill, 0.85, def.border);
+        }
+
+        this.updateBuildingInfoModal(b, def, now);
+        continue;
+      }
+
+      // ===== Producción =====
+      const cycle = b.prodCycle;
+      let p01 = 0;
+
+      if (!b.rewardReady) {
+        const elapsed = now - b.prodStart;
+        if (cycle <= 0) {
+          p01 = 1;
+          b.rewardReady = true;
+        } else {
+          p01 = Phaser.Math.Clamp(elapsed / cycle, 0, 1);
+          if (elapsed >= cycle) {
+            b.rewardReady = true;
+          }
+        }
+      } else {
+        p01 = 1;
+      }
+
+      // barra producción
+      b.prodBar.clear();
+      b.prodBar.fillStyle(0x0b1222, 0.75);
+      b.prodBar.fillRoundedRect(barX - 34, barY, 68, 8, 4);
+
+      b.prodBar.fillStyle(0x22c55e, 1);
+      b.prodBar.fillRoundedRect(barX - 34, barY, 68 * Phaser.Math.Clamp(p01, 0, 1), 8, 4);
+
+      // iconos de recompensa (manual)
+      const showReward = !!b.rewardReady;
+      if (b.rewardGoldIcon) {
+        b.rewardGoldIcon.setVisible(showReward);
+        if (showReward) b.rewardGoldIcon.setPosition(barX - 16, barY - 24);
+      }
+      if (b.rewardExpIcon) {
+        b.rewardExpIcon.setVisible(showReward);
+        if (showReward) b.rewardExpIcon.setPosition(barX + 16, barY - 24);
+      }
+
+      // ===== glow para dorado =====
+      if (def.glow && b.glowGfx) {
+        const pulse = 0.5 + 0.5 * Math.sin(now / 140);
+        b.glowGfx.clear();
+        b.glowGfx.lineStyle(2, 0xfbbf24, 0.25 + 0.35 * pulse);
+
+        // borde sobre las celdas
+        const sorted = [...b.cells].sort((a, b2) => (a.r + a.c) - (b2.r + b2.c));
+        for (const cell of sorted) {
+          const q = isoToScreen(cell.r, cell.c);
+          this.outlineDiamond(b.glowGfx, q.x, q.y, TILE_W, TILE_H);
+        }
+      }
+
+      this.updateBuildingInfoModal(b, def, now);
     }
   }
 
