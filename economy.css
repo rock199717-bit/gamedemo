@@ -89,3 +89,15 @@
   min-height: 42px;
 }
 
+/* móvil horizontal */
+@media (max-width: 900px) and (orientation: landscape) {
+  .gacha-card {
+    width: min(680px, 96vw);
+    padding: 10px;
+  }
+  .gacha-title { font-size: 16px; }
+  .gacha-tab, .gacha-btn { padding: 8px 10px; }
+  .gacha-banner { padding: 10px; }
+  .gacha-log { min-height: 36px; }
+}
+
