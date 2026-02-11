@@ -23,36 +23,127 @@ const BUILDING_TYPES = {
     reward: { exp: 1, gold: 10 },
     glow: false
   },
-
-  // ✅ PERMANENTE 4★ (los 3 cuadrados principales)
-  perm_blue_9: {
-    key: "perm_blue_9",
-    label: "Azul 9x9",
-    size: 9,
-    fill: 0x3b82f6,
-    border: 0x60a5fa,
+  green_2: {
+    key: "green_2",
+    label: "Verde 2x2",
+    size: 2,
+    fill: 0x22c55e,
+    border: 0x22c55e,
+    buildSeconds: 8,
+    prodSeconds: 60,
+    reward: { exp: 2, gold: 20 },
+    glow: false
+  },
+  green_3: {
+    key: "green_3",
+    label: "Verde 3x3",
+    size: 3,
+    fill: 0x22c55e,
+    border: 0x22c55e,
+    buildSeconds: 12,
+    prodSeconds: 60,
+    reward: { exp: 4, gold: 40 },
+    glow: false
+  },
+  // ✅ VERDE 4x4 (4★)
+  green_4: {
+    key: "green_4",
+    label: "Verde 4x4",
+    size: 4,
+    fill: 0x16a34a,
+    border: 0x22c55e,
     buildSeconds: 20,
     prodSeconds: 60,
     reward: { exp: 20, gold: 100 },
     glow: false
   },
-  perm_red_1: {
-    key: "perm_red_1",
+  // ✅ ROJOS (1★/2★/3★/4★)
+  red_1: {
+    key: "red_1",
     label: "Rojo 1x1",
     size: 1,
     fill: 0xef4444,
     border: 0xf87171,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 },
+    glow: false
+  },
+  red_2: {
+    key: "red_2",
+    label: "Rojo 2x2",
+    size: 2,
+    fill: 0xef4444,
+    border: 0xf87171,
+    buildSeconds: 8,
+    prodSeconds: 60,
+    reward: { exp: 2, gold: 20 },
+    glow: false
+  },
+  red_3: {
+    key: "red_3",
+    label: "Rojo 3x3",
+    size: 3,
+    fill: 0xef4444,
+    border: 0xf87171,
+    buildSeconds: 12,
+    prodSeconds: 60,
+    reward: { exp: 4, gold: 40 },
+    glow: false
+  },
+  // ✅ ROJO 4x4 (4★)
+  red_4: {
+    key: "red_4",
+    label: "Rojo 4x4",
+    size: 4,
+    fill: 0xb91c1c,
+    border: 0xef4444,
     buildSeconds: 20,
     prodSeconds: 60,
     reward: { exp: 20, gold: 100 },
     glow: false
   },
-  perm_yellow_4: {
-    key: "perm_yellow_4",
-    label: "Amarillo 4x4",
+  // ✅ AZULES (1★/2★/3★/4★)
+  blue_1: {
+    key: "blue_1",
+    label: "Azul 1x1",
+    size: 1,
+    fill: 0x3b82f6,
+    border: 0x60a5fa,
+    buildSeconds: 5,
+    prodSeconds: 60,
+    reward: { exp: 1, gold: 10 },
+    glow: false
+  },
+  blue_2: {
+    key: "blue_2",
+    label: "Azul 2x2",
+    size: 2,
+    fill: 0x3b82f6,
+    border: 0x60a5fa,
+    buildSeconds: 8,
+    prodSeconds: 60,
+    reward: { exp: 2, gold: 20 },
+    glow: false
+  },
+  blue_3: {
+    key: "blue_3",
+    label: "Azul 3x3",
+    size: 3,
+    fill: 0x3b82f6,
+    border: 0x60a5fa,
+    buildSeconds: 12,
+    prodSeconds: 60,
+    reward: { exp: 4, gold: 40 },
+    glow: false
+  },
+  // ✅ AZUL 4x4 (4★)
+  blue_4: {
+    key: "blue_4",
+    label: "Azul 4x4",
     size: 4,
-    fill: 0xfacc15,
-    border: 0xfde047,
+    fill: 0x1d4ed8,
+    border: 0x60a5fa,
     buildSeconds: 20,
     prodSeconds: 60,
     reward: { exp: 20, gold: 100 },
@@ -71,55 +162,55 @@ const BUILDING_TYPES = {
     reward: { exp: 10, gold: 150 },
     glow: false
   },
-
-  // ✅ LIMITADO 4★ (2x2) — recompensas NO las especificaste
-  // Por ahora las dejo iguales que el verde básico para que funcione y luego ajustamos.
-  lim_blue_2: {
-    key: "lim_blue_2",
-    label: "Azul 2x2",
-    size: 2,
+  // ✅ AZUL 9x9 (5★ permanente)
+  perm_blue_9: {
+    key: "perm_blue_9",
+    label: "Azul 9x9",
+    size: 9,
     fill: 0x3b82f6,
     border: 0x60a5fa,
-    buildSeconds: 5,
-    prodSeconds: 60,
-    reward: { exp: 1, gold: 10 }, // TODO: ajustar si quieres
+    buildSeconds: 120,     // 2 min
+    prodSeconds: 60,       // produce cada 1 min
+    reward: { exp: 10, gold: 150 },
     glow: false
   },
-  lim_red_2: {
-    key: "lim_red_2",
-    label: "Rojo 2x2",
-    size: 2,
-    fill: 0xef4444,
-    border: 0xf87171,
-    buildSeconds: 5,
-    prodSeconds: 60,
-    reward: { exp: 1, gold: 10 }, // TODO
-    glow: false
-  },
-  lim_yellow_2: {
-    key: "lim_yellow_2",
-    label: "Amarillo 2x2",
-    size: 2,
-    fill: 0xfacc15,
-    border: 0xfde047,
-    buildSeconds: 5,
-    prodSeconds: 60,
-    reward: { exp: 1, gold: 10 }, // TODO
+  // ✅ ROJO 9x9 (5★ permanente)
+  perm_red_9: {
+    key: "perm_red_9",
+    label: "Rojo 9x9",
+    size: 9,
+    fill: 0x991b1b,
+    border: 0xef4444,
+    buildSeconds: 120,     // 2 min
+    prodSeconds: 60,       // produce cada 1 min
+    reward: { exp: 10, gold: 150 },
     glow: false
   },
 
   // ✅ DORADO 5★ (limitado) con brillo
   lim_gold_2: {
     key: "lim_gold_2",
-    label: "Dorado 2x2",
-    size: 2,
+    label: "Dorado 9x9",
+    size: 9,
     fill: 0xfbbf24,
     border: 0xf59e0b,
-    buildSeconds: 300,     // 5 min
-    prodSeconds: 60,
-    reward: { exp: 35, gold: 300 },
+    buildSeconds: 60,      // rápida (base) -> 5★ lo reduce más
+    prodSeconds: 120,      // semi lenta (base) -> 5★ lo hace más lento
+    reward: { exp: 60, gold: 300 }, // muy alta (base) -> 5★ la triplica
     glow: true
   }
+};
+
+// =========================
+// RARITY MODS
+// buildSeconds, prodSeconds, reward multipliers
+// =========================
+const RARITY_MODS = {
+  1: { build: 0.6, prod: 1.25, reward: 0.6 },
+  2: { build: 0.8, prod: 1.0,  reward: 1.0 },
+  3: { build: 1.2, prod: 0.9,  reward: 1.4 },
+  4: { build: 0.7, prod: 1.15, reward: 2.0 },
+  5: { build: 0.6, prod: 1.3,  reward: 3.0 }
 };
 
 // 0 = libre, >0 = id edificio
@@ -127,7 +218,6 @@ const grid = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
 let nextBuildingId = 1;
 const buildings = new Map();
 
-let selectedSize = 1;
 let mode = "cursor"; // inicia en cursor
 
 const DRAG_THRESHOLD = 10;
@@ -278,14 +368,6 @@ class MainScene extends Phaser.Scene {
       ).setScrollFactor(0).setDepth(9999)
     );
 
-    this.sizeText = regUI(
-      this.add.text(
-        16, 40,
-        this.sizeLabel(),
-        { fontFamily: "Arial", fontSize: "14px", color: "#22c55e" }
-      ).setScrollFactor(0).setDepth(9999)
-    );
-
     this.modeText = regUI(
       this.add.text(
         16, 62,
@@ -295,7 +377,6 @@ class MainScene extends Phaser.Scene {
     );
 
     // crea botones UI (los registra adentro)
-    this.createSizeButtons(regUI);
     this.createCancelBuildButton(regUI);
     this.createCancelSelectButton(regUI);
     this.createConfirmButtons(regUI);
@@ -376,16 +457,20 @@ class MainScene extends Phaser.Scene {
       this.ghost.clear();
       if (!tile) return;
 
-      const ok = canPlace(selectedSize, tile.r, tile.c);
-      const color = ok ? 0x22c55e : 0xf87171;
+      const preview = this.getBuildPreview();
+      const size = preview.size;
+      const ok = canPlace(size, tile.r, tile.c);
+      const okColor = preview.def.fill ?? 0x22c55e;
+      const okBorder = preview.def.border ?? okColor;
+      const badColor = 0xf87171;
 
       const cells = [];
-      for (let r = tile.r; r < tile.r + selectedSize; r++) {
-        for (let c = tile.c; c < tile.c + selectedSize; c++) {
+      for (let r = tile.r; r < tile.r + size; r++) {
+        for (let c = tile.c; c < tile.c + size; c++) {
           if (inBounds(r, c)) cells.push({ r, c });
         }
       }
-      this.drawCells(this.ghost, cells, color, 0.25);
+      this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.25, ok ? okBorder : badColor);
     });
 
     this.input.on("pointerup", (pointer) => {
@@ -425,6 +510,8 @@ class MainScene extends Phaser.Scene {
       const idOnTile = grid[tile.r][tile.c];
 
       if (idOnTile) {
+        // En modo construcciÃ³n no abrir info de edificios
+        if (mode === "build") return;
         this.openBuildingMenu(idOnTile, pointer);
         return;
       }
@@ -437,8 +524,18 @@ class MainScene extends Phaser.Scene {
 
       if (mode === "cursor") return;
 
-      const ok = canPlace(selectedSize, tile.r, tile.c);
-      this.pending = { tile, size: selectedSize, ok, clickX: pointer.x, clickY: pointer.y };
+      const preview = this.getBuildPreview();
+      const size = preview.size;
+      const ok = canPlace(size, tile.r, tile.c);
+      this.pending = {
+        tile,
+        size,
+        ok,
+        clickX: pointer.x,
+        clickY: pointer.y,
+        color: preview.def.fill ?? 0x22c55e,
+        border: preview.def.border ?? (preview.def.fill ?? 0x22c55e)
+      };
 
       this.renderPendingGhost();
       this.updateConfirmButtonsPosition();
@@ -577,12 +674,15 @@ class MainScene extends Phaser.Scene {
   }
 
   // ================= UI helpers =================
-  sizeLabel() {
-    return `Tamaño: ${selectedSize}x${selectedSize} (${selectedSize * selectedSize} celdas)`;
-  }
-
   modeLabel() {
     return mode === "build" ? "Modo: 🏗 Construcción" : "Modo: 🖱 Cursor";
+  }
+
+  getBuildPreview() {
+    const typeKey = this.selectedBuildKey || "green_1";
+    const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
+    const size = def.size;
+    return { typeKey, def, size };
   }
 
   setBuildMode() {
@@ -602,12 +702,6 @@ class MainScene extends Phaser.Scene {
     this.cancelBuildBorder.setVisible(false);
   }
 
-  setSize(s) {
-    selectedSize = s;
-    this.sizeText.setText(this.sizeLabel());
-    this.setBuildMode();
-  }
-
   uiGuard(pointer) {
     this.uiClick = true;
     if (pointer?.event) {
@@ -616,33 +710,6 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  createSizeButtons(regUI) {
-    const btnStyle = { fontFamily: "Arial", fontSize: "14px", color: "#e5e7eb", backgroundColor: "#020617" };
-
-    const makeBtn = (x, y, label, size) => {
-      const t = regUI(
-        this.add.text(x, y, label, btnStyle)
-          .setPadding(8, 6, 8, 6)
-          .setInteractive({ useHandCursor: true })
-          .setScrollFactor(0)
-          .setDepth(9999)
-      );
-
-      t.on("pointerdown", (pointer) => {
-        this.uiGuard(pointer);
-        this.setSize(size);
-      });
-
-      const g = regUI(this.add.graphics().setScrollFactor(0).setDepth(9998));
-      g.lineStyle(1, 0x1e293b, 1);
-      g.strokeRoundedRect(x - 2, y - 2, t.width + 4, t.height + 4, 8);
-    };
-
-    makeBtn(16, 86, "1x1", 1);
-    makeBtn(78, 86, "2x2", 2);
-    makeBtn(140, 86, "3x3", 3);
-    makeBtn(202, 86, "4x4", 4);
-  }
 
   createCancelBuildButton(regUI) {
     const style = { fontFamily: "Arial", fontSize: "14px", color: "#22c55e", backgroundColor: "#020617" };
@@ -728,8 +795,8 @@ class MainScene extends Phaser.Scene {
     this.confirmOk.on("pointerdown", (pointer) => {
       this.uiGuard(pointer);
       if (!this.pending || !this.pending.ok) return;
-      const { tile, size } = this.pending;
-      this.placeBuilding(tile.r, tile.c, size);
+      const { tile } = this.pending;
+      this.placeBuilding(tile.r, tile.c);
       this.clearPending();
     });
 
@@ -776,10 +843,12 @@ class MainScene extends Phaser.Scene {
 
   renderPendingGhost() {
     if (!this.pending) return;
-    const { tile, size, ok } = this.pending;
+    const { tile, size, ok, color, border } = this.pending;
 
     this.ghost.clear();
-    const color = ok ? 0x22c55e : 0xf87171;
+    const okColor = color ?? 0x22c55e;
+    const okBorder = border ?? okColor;
+    const badColor = 0xf87171;
 
     const cells = [];
     for (let r = tile.r; r < tile.r + size; r++) {
@@ -787,7 +856,7 @@ class MainScene extends Phaser.Scene {
         if (inBounds(r, c)) cells.push({ r, c });
       }
     }
-    this.drawCells(this.ghost, cells, color, 0.35, color);
+    this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.35, ok ? okBorder : badColor);
   }
 
   // ===== Action buttons (⟲ ✋ 🗑 ✖) =====
@@ -862,6 +931,7 @@ class MainScene extends Phaser.Scene {
   }
 
   openBuildingMenu(idOnTile, pointer) {
+    if (mode === "build") return;
     this.closeBuildingMenu();
     this.clearPending();
     this.ghost.clear();
@@ -890,10 +960,819 @@ class MainScene extends Phaser.Scene {
   }
 
   getRarityForKey(typeKey) {
-    if (typeKey === "green_1") return 2;
-    if (typeKey === "perm_green_9" || typeKey === "lim_gold_2") return 5;
+    if (typeKey === "green_1") return 1;
+    if (typeKey === "green_2") return 2;
+    if (typeKey === "green_3") return 3;
+    if (typeKey === "green_4") return 4;
+    if (typeKey === "red_1") return 1;
+    if (typeKey === "red_2") return 2;
+    if (typeKey === "red_3") return 3;
+    if (typeKey === "red_4") return 4;
+    if (typeKey === "blue_1") return 1;
+    if (typeKey === "blue_2") return 2;
+    if (typeKey === "blue_3") return 3;
+    if (typeKey === "blue_4") return 4;
+    if (typeKey === "perm_green_9" || typeKey === "perm_blue_9" || typeKey === "perm_red_9" || typeKey === "lim_gold_2") return 5;
     if (typeof typeKey === "string" && (typeKey.startsWith("perm_") || typeKey.startsWith("lim_"))) return 4;
     return 2;
+  }
+
+  getColorForKey(typeKey) {
+    if (!typeKey) return null;
+    if (typeKey.startsWith("green_") || typeKey === "perm_green_9") return "green";
+    if (typeKey.startsWith("red_") || typeKey === "perm_red_9") return "red";
+    if (typeKey.startsWith("blue_") || typeKey === "perm_blue_9") return "blue";
+    if (typeKey === "lim_gold_2") return "gold";
+    return null;
+  }
+
+  buildEvoDiamonds(level) {
+    const filled = Math.max(0, Math.min(5, level || 0));
+    let html = `<div style="display:flex; gap:6px;">`;
+    for (let i = 0; i < 5; i++) {
+      const on = i < filled ? " evo-d on" : " evo-d";
+      html += `<span class="${on}"></span>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  applyEvolution(b, now = Date.now()) {
+    if (!b) return;
+    const level = Math.max(0, Math.min(5, b.evoLevel || 0));
+    const stage = (typeof b.evoStage === "number") ? b.evoStage : 5;
+    const total = (stage >= 6) ? (5 + level) : level;
+    const mult = 1 + (0.01 * total);
+    const speed = Math.max(0.5, 1 - (0.01 * total));
+
+    const prevBuild = b.buildSeconds ?? b.baseBuildSeconds ?? 0;
+    const prevProd = b.prodSeconds ?? b.baseProdSeconds ?? 1;
+
+    const baseBuild = b.baseBuildSeconds ?? prevBuild;
+    const baseProd = b.baseProdSeconds ?? prevProd;
+    const baseReward = b.baseReward || b.reward || { exp: 0, gold: 0 };
+
+    b.buildSeconds = Math.max(0, Math.round(baseBuild * speed));
+    b.prodSeconds = Math.max(1, Math.round(baseProd * speed));
+    b.reward = {
+      exp: Math.max(0, Math.round(baseReward.exp * mult)),
+      gold: Math.max(0, Math.round(baseReward.gold * mult))
+    };
+
+    b.prodCycle = b.prodSeconds * 1000;
+
+    if (!b.isBuilt) {
+      const prevTotal = Math.max(1, prevBuild * 1000);
+      const remain = Math.max(0, b.buildEnd - now);
+      const ratio = remain / prevTotal;
+      b.buildEnd = now + Math.round((b.buildSeconds * 1000) * ratio);
+    } else if (!b.rewardReady) {
+      const prevCycle = Math.max(1, prevProd * 1000);
+      const elapsed = Math.max(0, now - b.prodStart);
+      const ratio = elapsed / prevCycle;
+      b.prodStart = now - Math.min(b.prodSeconds * 1000, Math.round((b.prodSeconds * 1000) * ratio));
+    }
+  }
+
+  transcendBuilding(b, def) {
+    if (!b) return;
+    b.evoStage = 6;
+    b.evoLevel = 0;
+    this.applyEvolution(b, Date.now());
+    if (def) this.updateBuildingInfoModal(b, def, Date.now());
+  }
+
+  openEvolutionModal(b) {
+    if (!b || !this.economy) return;
+    if (!b.isBuilt) return;
+    const existing = document.getElementById("evo-modal");
+    if (existing) existing.remove();
+
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+    const targetRarity = this.getRarityForKey(b.typeKey);
+    if (targetRarity < 5) return;
+    const targetSize = def.size;
+    const targetColor = this.getColorForKey(b.typeKey);
+    const fillHex = this.colorToHex(def.fill);
+    const borderHex = this.colorToHex(def.border);
+    const previewSvg = `
+      <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="60,8 112,40 60,72 8,40" fill="${fillHex}" stroke="${borderHex}" stroke-width="3"/>
+      </svg>
+    `;
+
+    const candidates = Object.keys(this.economy.inventory || {}).filter((key) => {
+      const count = this.economy.inventory[key] || 0;
+      if (count <= 0) return false;
+      const item = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[key]) ? ITEM_DEFS[key] : null;
+      const size = item?.size ?? BUILDING_TYPES[key]?.size;
+      const rarity = item?.rarity ?? this.getRarityForKey(key);
+      const color = this.getColorForKey(key);
+      return size === targetSize && rarity === targetRarity && color === targetColor;
+    });
+
+    const modal = document.createElement("div");
+    modal.id = "evo-modal";
+    Object.assign(modal.style, {
+      position: "fixed",
+      inset: "0",
+      background: "rgba(0,0,0,0.6)",
+      zIndex: "999999",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    });
+
+    const list = candidates.length
+      ? candidates.map((key) => {
+          const item = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[key]) ? ITEM_DEFS[key] : { name: key, size: targetSize, rarity: targetRarity, icon: "❖" };
+          const count = this.economy.inventory[key] || 0;
+          return `
+            <button class="evo-item" data-key="${key}">
+              <span class="evo-item-left">
+                <span class="evo-item-ico">${item.icon || "❖"}</span>
+                <span>
+                  <div class="evo-item-name">${item.name || key}</div>
+                  <div class="evo-item-meta">${item.size}x${item.size} • ${item.rarity}★</div>
+                </span>
+              </span>
+              <b class="evo-item-count">x${count}</b>
+            </button>
+          `;
+        }).join("")
+      : `<div class="evo-empty">Sin duplicados para fusionar.</div>`;
+
+    const evoLevel = Math.max(0, Math.min(5, b.evoLevel || 0));
+    const evoStage = (typeof b.evoStage === "number")
+      ? b.evoStage
+      : (targetRarity === 5 ? 5 : 0);
+    const stageLabel = (evoStage >= 5 ? evoStage : targetRarity);
+    const displayRarity = (targetRarity === 5 && evoStage >= 6) ? 6 : targetRarity;
+    const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const frameClass = displayRarity === 6
+      ? `frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
+      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? " chrome" : "";
+    const slotsHtml = Array.from({ length: 5 }, (_, i) => {
+      const fixed = i < evoLevel;
+      return `
+        <div class="evo-slot${fixed ? " filled fixed" : ""}" data-slot="${i}" data-fixed="${fixed ? "1" : "0"}">
+          <span class="evo-slot-ico"></span>
+        </div>
+      `;
+    }).join("");
+    const evoTransStars = Array.from({ length: 6 }, (_, i) => (
+      `<span class="star" style="--h:${i * 60}deg">★</span>`
+    )).join("");
+    const evoStarsHtml = (displayRarity === 6) ? evoTransStars : "★".repeat(displayRarity);
+
+    modal.innerHTML = `
+      <div class="evo-window">
+        <style>
+          #evo-modal .evo-window {
+            width: min(620px, 94vw);
+            background: #0b1222;
+            color: #e5e7eb;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px;
+            padding: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.5);
+            font-family: Arial;
+            display: grid;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+          }
+          #evo-modal .evo-header {
+            display:flex; justify-content:space-between; align-items:center;
+          }
+          #evo-modal .evo-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 12px;
+          }
+          #evo-modal .evo-list {
+            display: grid;
+            gap: 8px;
+            max-height: 280px;
+            overflow: auto;
+          }
+          #evo-modal .evo-item {
+            display:flex; justify-content:space-between; align-items:center; gap:10px;
+            width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12);
+            background:#0b1222; color:#e5e7eb; cursor:pointer;
+          }
+          #evo-modal .evo-item:disabled { opacity:.5; cursor:not-allowed; }
+          #evo-modal .evo-item-left { display:flex; align-items:center; gap:10px; }
+          #evo-modal .evo-item-ico { font-size: 20px; }
+          #evo-modal .evo-item-name { font-weight: 700; }
+          #evo-modal .evo-item-meta { opacity:.75; font-size:12px; }
+          #evo-modal .evo-main {
+            display: grid;
+            gap: 8px;
+            align-content: start;
+          }
+          #evo-modal .evo-main-card {
+            position: relative;
+            padding: 8px;
+            border-radius: 14px;
+            background: #0f172a;
+          }
+          #evo-modal .evo-main-card.evo-animate {
+            animation: evoPulse .5s ease;
+          }
+          #evo-modal .preview-frame { width: 100%; height: 140px; }
+          #evo-modal .preview-inner { height: 100%; }
+          #evo-modal .evo-title { font-weight: 700; }
+          #evo-modal .evo-stars { letter-spacing: 1px; color: #fbbf24; }
+          #evo-modal .evo-slots {
+            display:flex; gap:10px; justify-content:center; align-items:center;
+          }
+          #evo-modal .evo-slot {
+            width: 22px; height: 22px;
+            border:1px solid rgba(148,163,184,.6);
+            background: rgba(148,163,184,.12);
+            transform: rotate(45deg);
+            border-radius: 2px;
+            display:flex; align-items:center; justify-content:center;
+          }
+          #evo-modal .evo-slot-ico {
+            transform: rotate(-45deg) scale(.9);
+            font-size: 12px;
+            line-height: 1;
+          }
+          #evo-modal .evo-slot.filled {
+            background: #fbbf24;
+            border-color: #f59e0b;
+            box-shadow: 0 0 8px rgba(245,158,11,.6);
+          }
+          #evo-modal .evo-slot.pending {
+            background: #fde68a;
+            border-color: #f59e0b;
+            box-shadow: 0 0 10px rgba(245,158,11,.7);
+          }
+          #evo-modal .evo-slot.pop { animation: slotPop .35s ease; }
+          #evo-modal .frame-1, #evo-modal .frame-2, #evo-modal .frame-3, #evo-modal .frame-4, #evo-modal .frame-5, #evo-modal .frame-6, #evo-modal .frame-6max {
+            position: relative;
+            width: 100%;
+            height: 140px;
+            padding: 6px;
+            border-radius: 14px;
+            display:flex; align-items:center; justify-content:center;
+            overflow: hidden;
+          }
+          #evo-modal .frame-1 { background: #6b7280; }
+          #evo-modal .frame-2 { background: #065f46; }
+          #evo-modal .frame-3 { background: #78350f; }
+          #evo-modal .frame-4 { background: #94a3b8; }
+          #evo-modal .frame-5 { background: #b45309; }
+          #evo-modal .evo-on {
+            box-shadow:
+              inset 0 1px 2px rgba(255,255,255,.35),
+              inset 0 -3px 6px rgba(0,0,0,.65),
+              0 0 10px rgba(255,255,255,.12);
+          }
+          #evo-modal .evo-on::before {
+            content:"";
+            position:absolute;
+            inset:2px;
+            border-radius:12px;
+            border:1px solid rgba(255,255,255,.28);
+            pointer-events:none;
+            mix-blend-mode: screen;
+          }
+          #evo-modal .evo-on::after {
+            content:"";
+            position:absolute;
+            inset:-40%;
+            background: linear-gradient(120deg,
+              rgba(255,255,255,0) 40%,
+              rgba(255,255,255,.35) 52%,
+              rgba(255,255,255,0) 64%);
+            opacity:.55;
+            transform: translateX(-20%) rotate(8deg);
+            pointer-events:none;
+          }
+          #evo-modal .frame-1.evo-on {
+            background: linear-gradient(135deg,#e5e7eb 0%, #9ca3af 45%, #f8fafc 60%, #6b7280 100%);
+          }
+          #evo-modal .frame-2.evo-on {
+            background: linear-gradient(135deg,#34d399 0%, #16a34a 45%, #86efac 60%, #065f46 100%);
+          }
+          #evo-modal .frame-3.evo-on {
+            background: linear-gradient(135deg,#f59e0b 0%, #b45309 45%, #fcd34d 60%, #78350f 100%);
+          }
+          #evo-modal .frame-4.evo-on {
+            background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
+          }
+          #evo-modal .frame-5.evo-on {
+            background: linear-gradient(135deg,#fde68a 0%, #f59e0b 45%, #fbbf24 60%, #b45309 100%);
+          }
+          #evo-modal .frame-6 {
+            background: conic-gradient(from 0deg,#22c55e,#38bdf8,#a855f7,#f59e0b,#ef4444,#22c55e);
+          }
+          #evo-modal .frame-6max { box-shadow: 0 0 18px rgba(255,255,255,.4); }
+          #evo-modal .preview-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            background: rgba(2,6,23,.65);
+            display:flex; align-items:center; justify-content:center;
+            overflow:hidden;
+          }
+          #evo-modal .preview-inner.chrome::after {
+            content:"";
+            position:absolute;
+            inset:-60%;
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.65) 35%, rgba(255,255,255,0) 65%);
+            animation: chromeSheen 2.2s linear infinite;
+            mix-blend-mode: screen;
+            opacity:.9;
+          }
+          #evo-modal .evo-empty { opacity:.75; padding: 10px; }
+          #evo-modal .evo-trans-fx {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+              radial-gradient(circle at 50% 45%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%),
+              radial-gradient(circle at 15% 20%, rgba(168,85,247,.18), rgba(168,85,247,0) 55%),
+              radial-gradient(circle at 85% 30%, rgba(34,197,94,.18), rgba(34,197,94,0) 55%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+          }
+          #evo-modal .evo-trans-fx.on {
+            animation: evoTransFade 1.6s ease forwards;
+          }
+          #evo-modal .evo-trans-stage {
+            position: relative;
+            width: 240px;
+            height: 300px;
+          }
+          #evo-modal .evo-trans-ring {
+            position: absolute;
+            inset: -10%;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,.45);
+            box-shadow: 0 0 20px rgba(255,255,255,.25);
+            opacity: .8;
+            animation: evoRingSpin 1.6s ease forwards;
+          }
+          #evo-modal .evo-trans-envelope {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            width: 220px;
+            height: 130px;
+            transform: translateX(-50%) translateY(24px);
+            border-radius: 14px;
+            background: linear-gradient(160deg, #1f2937, #0b1222);
+            box-shadow: 0 16px 30px rgba(0,0,0,.45);
+            animation: evoEnvUp 1.2s ease forwards;
+          }
+          #evo-modal .evo-trans-envelope::before {
+            content:"";
+            position:absolute;
+            inset: 6px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.18);
+          }
+          #evo-modal .evo-trans-card {
+            position: absolute;
+            left: 50%;
+            bottom: 30px;
+            width: 150px;
+            height: 210px;
+            transform: translate(-50%, 70px) scale(.86) rotate(-6deg);
+            border-radius: 16px;
+            background: linear-gradient(180deg, #0f172a, #0b1222);
+            border: 2px solid var(--fx-accent, #f59e0b);
+            box-shadow: 0 18px 32px rgba(0,0,0,.45), 0 0 18px rgba(245,158,11,.35);
+            animation: evoCardRise 1.3s ease forwards;
+            overflow: hidden;
+          }
+          #evo-modal .evo-trans-card::after {
+            content:"";
+            position:absolute;
+            inset:-40%;
+            background: linear-gradient(120deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.7) 52%, rgba(255,255,255,0) 64%);
+            opacity: .7;
+            transform: translateX(-30%) rotate(8deg);
+            animation: evoCardSheen 1.2s ease forwards;
+          }
+          #evo-modal .evo-trans-sigil {
+            margin-top: 18px;
+            font-size: 28px;
+            color: #fbbf24;
+            text-align: center;
+          }
+          #evo-modal .evo-trans-title {
+            margin-top: 6px;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: .5px;
+          }
+          #evo-modal .evo-trans-stars {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            margin-top: 8px;
+            font-size: 18px;
+          }
+          #evo-modal .evo-trans-stars .star {
+            display: inline-block;
+            background: conic-gradient(from var(--h), #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 8px rgba(255,255,255,.35);
+          }
+          #evo-modal .evo-stars .star {
+            display: inline-block;
+            margin: 0 2px;
+            background: conic-gradient(from var(--h), #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 8px rgba(255,255,255,.35);
+          }
+          #evo-modal .evo-trans-flash {
+            position: absolute;
+            inset: -30%;
+            background:
+              radial-gradient(circle at 50% 50%, rgba(255,255,255,.8), rgba(255,255,255,0) 60%);
+            opacity: 0;
+            animation: evoFlash 1.1s ease forwards;
+          }
+          @keyframes evoPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+          }
+          @keyframes slotPop {
+            0% { transform: rotate(45deg) scale(.6); opacity:.3; }
+            70% { transform: rotate(45deg) scale(1.1); opacity:1; }
+            100% { transform: rotate(45deg) scale(1); opacity:1; }
+          }
+          @keyframes chromeSheen {
+            0% { transform: translateX(-30%) rotate(8deg); opacity: .1; }
+            50% { opacity: .9; }
+            100% { transform: translateX(30%) rotate(8deg); opacity: .1; }
+          }
+          @keyframes evoTransFade {
+            0% { opacity: 0; }
+            15% { opacity: 1; }
+            80% { opacity: .95; }
+            100% { opacity: 0; }
+          }
+          @keyframes evoRingSpin {
+            0% { transform: scale(.85) rotate(0deg); opacity: 0; }
+            40% { opacity: .9; }
+            100% { transform: scale(1.05) rotate(120deg); opacity: 0; }
+          }
+          @keyframes evoEnvUp {
+            0% { transform: translateX(-50%) translateY(28px); opacity: .4; }
+            100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+          }
+          @keyframes evoCardRise {
+            0% { transform: translate(-50%, 70px) scale(.86) rotate(-6deg); opacity: .2; }
+            60% { transform: translate(-50%, -10px) scale(1) rotate(2deg); opacity: 1; }
+            100% { transform: translate(-50%, -18px) scale(1.02) rotate(0deg); opacity: 1; }
+          }
+          @keyframes evoCardSheen {
+            0% { opacity: 0; transform: translateX(-30%) rotate(8deg); }
+            40% { opacity: .9; }
+            100% { opacity: 0; transform: translateX(30%) rotate(8deg); }
+          }
+          @keyframes evoFlash {
+            0% { opacity: 0; }
+            35% { opacity: .9; }
+            100% { opacity: 0; }
+          }
+          @media (max-width: 900px) and (orientation: landscape) {
+            #evo-modal .evo-grid { grid-template-columns: 1fr; }
+          }
+        </style>
+        <div id="evoTransFx" class="evo-trans-fx" style="--fx-accent:${borderHex};">
+          <div class="evo-trans-stage">
+            <div class="evo-trans-ring"></div>
+            <div class="evo-trans-envelope"></div>
+            <div class="evo-trans-card">
+              <div class="evo-trans-sigil">✦</div>
+              <div class="evo-trans-title">Transcender</div>
+              <div class="evo-trans-stars">${evoTransStars}</div>
+            </div>
+            <div class="evo-trans-flash"></div>
+          </div>
+        </div>
+        <div class="evo-header">
+          <b>Fusionar (${def.label || b.typeKey})</b>
+          <button id="evoClose" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:10px;cursor:pointer;">✖</button>
+        </div>
+        <div class="evo-grid">
+          <div class="evo-list">
+            ${list}
+          </div>
+          <div class="evo-main">
+            <div id="evoMainCard" class="evo-main-card">
+              <div id="evoFrame" class="${frameClass}">
+                <div id="evoInner" class="preview-inner${chromeClass}">
+                  ${previewSvg}
+                </div>
+              </div>
+            </div>
+            <div class="evo-title">${def.label || b.typeKey}</div>
+          <div id="evoStars" class="evo-stars">${evoStarsHtml}</div>
+            <small id="evoLevelText" style="opacity:.75;">Evolucion ${stageLabel}★: ${evoLevel}/5 (+${(evoStage >= 6) ? (5 + evoLevel) : evoLevel}%)</small>
+          </div>
+        </div>
+        <div id="evoSlots" class="evo-slots">
+          ${slotsHtml}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button id="evoApply" style="
+            background:#fbbf24;color:#1f1400;border:none;
+            padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:700;
+          ">Evolucionar</button>
+          <button id="evoTrans" style="
+            background:#8b5cf6;color:#fff;border:none;
+            padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:700;
+            display:none;
+          ">Transcender</button>
+        </div>
+        <small id="evoNote" style="opacity:.7;">
+          Selecciona duplicados y luego pulsa Evolucionar.
+        </small>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      if (modal.parentNode) modal.remove();
+      this.updateBuildingInfoModal(b, def, Date.now());
+    };
+    modal.querySelector("#evoClose").onclick = close;
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+
+    const slots = Array.from(modal.querySelectorAll(".evo-slot"));
+    const evoStars = modal.querySelector("#evoStars");
+    const evoLevelText = modal.querySelector("#evoLevelText");
+    const evoMainCard = modal.querySelector("#evoMainCard");
+    const evoFrame = modal.querySelector("#evoFrame");
+    const evoInner = modal.querySelector("#evoInner");
+    const evoApply = modal.querySelector("#evoApply");
+    const evoTrans = modal.querySelector("#evoTrans");
+    const evoFx = modal.querySelector("#evoTransFx");
+
+    const triggerEvoFx = () => {
+      if (!evoFx) return;
+      evoFx.classList.remove("on");
+      void evoFx.offsetWidth;
+      evoFx.classList.add("on");
+    };
+
+    const pendingUsed = {};
+    const getStage = () => (typeof b.evoStage === "number")
+      ? b.evoStage
+      : (targetRarity === 5 ? 5 : 0);
+    const getLevel = () => Math.max(0, Math.min(5, b.evoLevel || 0));
+    const pendingTotal = () => slots.filter((s) => s.dataset.pending === "1").length;
+    const remainingSlots = () => Math.max(0, 5 - getLevel() - pendingTotal());
+
+    const syncFixedSlots = () => {
+      const level = getLevel();
+      slots.forEach((s, i) => {
+        const fixed = i < level;
+        s.dataset.fixed = fixed ? "1" : "0";
+        s.classList.toggle("fixed", fixed);
+        if (fixed) {
+          s.classList.add("filled");
+          s.classList.remove("pending");
+          s.dataset.pending = "";
+          s.dataset.key = "";
+          const ico = s.querySelector(".evo-slot-ico");
+          if (ico) ico.textContent = "";
+        } else if (s.dataset.pending !== "1") {
+          s.classList.remove("filled");
+          s.classList.remove("pending");
+          s.dataset.key = "";
+          const ico = s.querySelector(".evo-slot-ico");
+          if (ico) ico.textContent = "";
+        }
+      });
+    };
+
+    const refreshMeta = () => {
+      const level = getLevel();
+      const stage = getStage();
+      const total = (stage >= 6) ? (5 + level) : level;
+      if (evoLevelText) evoLevelText.textContent = `Evolucion ${stage >= 5 ? stage : targetRarity}★: ${level}/5 (+${total}%)`;
+
+      const display = (targetRarity === 5 && stage >= 6) ? 6 : targetRarity;
+      const evoActive = (level > 0) || (stage >= 6);
+      if (evoStars) {
+        if (display === 6) {
+          evoStars.innerHTML = evoTransStars;
+        } else {
+          evoStars.textContent = "★".repeat(display);
+        }
+      }
+      const frameCls = display === 6
+        ? `frame-6${(stage >= 6 && level >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
+        : `frame-${display}${evoActive ? " evo-on" : ""}`;
+      if (evoFrame) evoFrame.className = frameCls;
+      if (evoInner) evoInner.className = `preview-inner${(display === 6 && stage >= 6 && level >= 5) ? " chrome" : ""}`;
+    };
+
+    const updateListCounts = () => {
+      const remaining = remainingSlots();
+      modal.querySelectorAll("[data-key]").forEach((btn) => {
+        const key = btn.getAttribute("data-key");
+        const count = this.economy.inventory[key] || 0;
+        const used = pendingUsed[key] || 0;
+        const left = Math.max(0, count - used);
+        const countEl = btn.querySelector(".evo-item-count");
+        if (countEl) countEl.textContent = `x${left}`;
+        if (left <= 0 || remaining <= 0) {
+          btn.setAttribute("disabled", "true");
+        } else {
+          btn.removeAttribute("disabled");
+        }
+      });
+    };
+
+    const updateApplyState = () => {
+      const pending = pendingTotal();
+      if (evoApply) {
+        if (pending <= 0) {
+          evoApply.setAttribute("disabled", "true");
+          evoApply.textContent = "Evolucionar";
+        } else {
+          evoApply.removeAttribute("disabled");
+          evoApply.textContent = `Evolucionar (+${pending})`;
+        }
+      }
+      if (evoTrans) {
+        const stageNow = getStage();
+        const levelNow = getLevel();
+        const ready = (stageNow === 5 && levelNow >= 5 && pending === 0);
+        if (ready) {
+          evoTrans.style.display = "inline-block";
+          evoTrans.removeAttribute("disabled");
+        } else {
+          evoTrans.style.display = "none";
+          evoTrans.setAttribute("disabled", "true");
+        }
+      }
+    };
+
+    const addPending = (key, icon) => {
+      if (remainingSlots() <= 0) return;
+      const count = this.economy.inventory[key] || 0;
+      const used = pendingUsed[key] || 0;
+      if (used >= count) return;
+      const slot = slots.find((s) => s.dataset.fixed !== "1" && s.dataset.pending !== "1");
+      if (!slot) return;
+      slot.dataset.pending = "1";
+      slot.dataset.key = key;
+      slot.classList.add("filled", "pending", "pop");
+      const ico = slot.querySelector(".evo-slot-ico");
+      if (ico) ico.textContent = icon || "❖";
+      setTimeout(() => slot.classList.remove("pop"), 350);
+      pendingUsed[key] = used + 1;
+      updateListCounts();
+      updateApplyState();
+    };
+
+    const clearPending = () => {
+      slots.forEach((s) => {
+        if (s.dataset.pending === "1") {
+          s.dataset.pending = "";
+          s.dataset.key = "";
+          s.classList.remove("pending");
+          if (s.dataset.fixed !== "1") s.classList.remove("filled");
+          const ico = s.querySelector(".evo-slot-ico");
+          if (ico) ico.textContent = "";
+        }
+      });
+      Object.keys(pendingUsed).forEach((k) => delete pendingUsed[k]);
+      updateListCounts();
+      updateApplyState();
+    };
+
+    slots.forEach((slot) => {
+      slot.addEventListener("click", () => {
+        if (slot.dataset.pending !== "1") return;
+        const key = slot.dataset.key;
+        slot.dataset.pending = "";
+        slot.dataset.key = "";
+        slot.classList.remove("pending");
+        if (slot.dataset.fixed !== "1") slot.classList.remove("filled");
+        const ico = slot.querySelector(".evo-slot-ico");
+        if (ico) ico.textContent = "";
+        if (key) pendingUsed[key] = Math.max(0, (pendingUsed[key] || 1) - 1);
+        updateListCounts();
+        updateApplyState();
+      });
+    });
+
+    modal.querySelectorAll("[data-key]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-key");
+        if (!key) return;
+        const icon = btn.querySelector(".evo-item-ico")?.textContent || "❖";
+        addPending(key, icon);
+      });
+    });
+
+    const flashInfoModal = () => {
+      this.updateBuildingInfoModal(b, def, Date.now());
+    };
+
+    if (evoApply) {
+      evoApply.addEventListener("click", () => {
+        const pending = pendingTotal();
+        if (pending <= 0) return;
+        const stageNow = getStage();
+        const levelNow = getLevel();
+        if (stageNow >= 6 && levelNow >= 5) return;
+
+        for (const [key, used] of Object.entries(pendingUsed)) {
+          if ((this.economy.inventory[key] || 0) < used) {
+            updateListCounts();
+            return;
+          }
+        }
+
+        for (const [key, used] of Object.entries(pendingUsed)) {
+          const ok = this.economy.consumeItem(key, used);
+          if (!ok) {
+            updateListCounts();
+            return;
+          }
+        }
+
+        if (stageNow === 5) {
+          b.evoStage = 5;
+          b.evoLevel = Math.min(5, levelNow + pending);
+        } else {
+          b.evoStage = stageNow;
+          b.evoLevel = Math.min(5, levelNow + pending);
+        }
+
+        this.applyEvolution(b, Date.now());
+        this.updateBuildingInfoModal(b, def, Date.now());
+        this.openBuildingInfoModal(b.id);
+
+        if (evoMainCard) {
+          evoMainCard.classList.remove("evo-animate");
+          void evoMainCard.offsetWidth;
+          evoMainCard.classList.add("evo-animate");
+        }
+
+        clearPending();
+        syncFixedSlots();
+        refreshMeta();
+        updateListCounts();
+        updateApplyState();
+      });
+    }
+
+    if (evoTrans) {
+      evoTrans.addEventListener("click", () => {
+        const stageNow = getStage();
+        const levelNow = getLevel();
+        if (!(stageNow === 5 && levelNow >= 5)) return;
+
+        this.transcendBuilding(b, def);
+        triggerEvoFx();
+        this.openBuildingInfoModal(b.id);
+
+        if (evoMainCard) {
+          evoMainCard.classList.remove("evo-animate");
+          void evoMainCard.offsetWidth;
+          evoMainCard.classList.add("evo-animate");
+        }
+        flashInfoModal();
+
+        syncFixedSlots();
+        refreshMeta();
+        updateListCounts();
+        updateApplyState();
+      });
+    }
+
+    syncFixedSlots();
+    refreshMeta();
+    updateListCounts();
+    updateApplyState();
   }
 
   formatSeconds(s) {
@@ -918,16 +1797,31 @@ class MainScene extends Phaser.Scene {
     if (!b) return;
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
-    const rarity = this.getRarityForKey(def.key || b.typeKey);
-    const stars = "★".repeat(rarity);
+    const baseRarity = this.getRarityForKey(def.key || b.typeKey);
+    const evoLevel = b.evoLevel || 0;
+    const evoStage = (typeof b.evoStage === "number")
+      ? b.evoStage
+      : (baseRarity === 5 ? 5 : 0);
+    const displayRarity = (baseRarity === 5 && evoStage >= 6) ? 6 : baseRarity;
+    const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const stars = "★".repeat(displayRarity);
+    const starsHtml = (displayRarity === 6)
+      ? Array.from({ length: 6 }, (_, i) => `<span class="star star-6" style="--h:${i * 60}deg">★</span>`).join("")
+      : stars;
+    const starClass = (displayRarity === 6) ? "stars-6" : (displayRarity === 5 ? "stars-5" : "stars-base");
+    const frameClass = displayRarity === 6
+      ? `frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
+      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
+    const winClass = `building-window win-${displayRarity}${evoActive ? " evo-on" : ""}${(displayRarity === 6 && evoLevel >= 5) ? " win-6max" : ""}`;
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? " chrome" : "";
     const baseLabel = def.label || def.key;
     const displayLabel = (b.typeKey === "green_1" && b.size !== def.size)
       ? `Verde ${b.size}x${b.size}`
       : baseLabel;
-    const buildLabel = this.formatSeconds(def.buildSeconds);
-    const prodLabel = this.formatSeconds(def.prodSeconds);
-    const rewardGold = def.reward?.gold ?? 0;
-    const rewardExp = def.reward?.exp ?? 0;
+    const buildLabel = this.formatSeconds(b.buildSeconds ?? def.buildSeconds);
+    const prodLabel = this.formatSeconds(b.prodSeconds ?? def.prodSeconds);
+    const rewardGold = b.reward?.gold ?? def.reward?.gold ?? 0;
+    const rewardExp = b.reward?.exp ?? def.reward?.exp ?? 0;
     const fillHex = this.colorToHex(def.fill);
     const borderHex = this.colorToHex(def.border);
     const previewSvg = `
@@ -938,6 +1832,7 @@ class MainScene extends Phaser.Scene {
 
     const modal = document.createElement("div");
     modal.id = "building-modal";
+    modal.dataset.buildingId = String(id);
     Object.assign(modal.style, {
       position: "fixed",
       inset: "0",
@@ -950,7 +1845,159 @@ class MainScene extends Phaser.Scene {
     });
 
     modal.innerHTML = `
-      <div class="building-window" style="
+      <style>
+        #building-modal .evo-row { display:flex; align-items:center; gap:8px; }
+        #building-modal .building-window {
+          position: relative;
+        }
+        #building-modal .building-window.win-1 { border-color: #9ca3af; box-shadow: 0 10px 30px rgba(148,163,184,.18); }
+        #building-modal .building-window.win-2 { border-color: #16a34a; box-shadow: 0 10px 30px rgba(34,197,94,.18); }
+        #building-modal .building-window.win-3 { border-color: #b45309; box-shadow: 0 10px 30px rgba(180,83,9,.2); }
+        #building-modal .building-window.win-4 { border-color: #94a3b8; box-shadow: 0 10px 34px rgba(148,163,184,.22); }
+        #building-modal .building-window.win-5 { border-color: #f59e0b; box-shadow: 0 12px 40px rgba(245,158,11,.25); }
+        #building-modal .building-window.win-6 {
+          border-color: #a855f7;
+          box-shadow: 0 14px 46px rgba(168,85,247,.25), 0 0 20px rgba(34,197,94,.18);
+        }
+        #building-modal .building-window.win-6max {
+          box-shadow: 0 16px 60px rgba(168,85,247,.35), 0 0 28px rgba(59,130,246,.35);
+        }
+        #building-modal .building-window.evo-on {
+          box-shadow:
+            0 12px 40px rgba(255,255,255,.08),
+            0 0 18px rgba(255,255,255,.12);
+        }
+        #building-modal .evo-d { width:12px; height:12px; border:1px solid rgba(148,163,184,.6); transform: rotate(45deg); background: rgba(148,163,184,.12); border-radius:2px; }
+        #building-modal .evo-d.on { background: #fbbf24; border-color: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,.6); }
+        #building-modal .preview-frame {
+          position: relative;
+          width: 140px;
+          height: 90px;
+          padding: 6px;
+          border-radius: 14px;
+          background: #0f172a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.45);
+          overflow: hidden;
+        }
+        #building-modal .preview-frame::before {
+          content: "";
+          position: absolute;
+          inset: 2px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,.08);
+          pointer-events: none;
+        }
+        #building-modal .preview-frame.evo-on {
+          box-shadow:
+            inset 0 1px 2px rgba(255,255,255,.35),
+            inset 0 -3px 6px rgba(0,0,0,.65),
+            0 0 12px rgba(255,255,255,.12);
+        }
+        #building-modal .preview-frame.evo-on::before {
+          border: 1px solid rgba(255,255,255,.28);
+          mix-blend-mode: screen;
+        }
+        #building-modal .preview-frame.evo-on::after {
+          content: "";
+          position: absolute;
+          inset: -40%;
+          background: linear-gradient(120deg,
+            rgba(255,255,255,0) 40%,
+            rgba(255,255,255,.35) 52%,
+            rgba(255,255,255,0) 64%);
+          opacity: .55;
+          transform: translateX(-20%) rotate(8deg);
+          pointer-events: none;
+        }
+        #building-modal .preview-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 10px;
+          background: rgba(2,6,23,.65);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        #building-modal .preview-stars { font-weight: 800; letter-spacing: 1px; }
+        #building-modal .stars-base { color: #fbbf24; text-shadow: 0 0 6px rgba(251,191,36,.35); }
+        #building-modal .stars-5 {
+          background: linear-gradient(135deg,#fff1b5 0%, #fbbf24 45%, #fde68a 60%, #b45309 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          -webkit-text-fill-color: transparent;
+          text-shadow: 0 0 10px rgba(245,158,11,.35);
+        }
+        #building-modal .stars-6 {
+          color: #e5e7eb;
+          text-shadow: 0 0 12px rgba(255,255,255,.35);
+        }
+        #building-modal .preview-stars .star-6 {
+          display: inline-block;
+          margin: 0 2px;
+          background: conic-gradient(from var(--h), #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          -webkit-text-fill-color: transparent;
+          text-shadow: 0 0 10px rgba(255,255,255,.35);
+        }
+        #building-modal .preview-inner.chrome::after {
+          content: "";
+          position: absolute;
+          inset: -60%;
+          background: linear-gradient(120deg,
+            rgba(255,255,255,0) 0%,
+            rgba(255,255,255,.65) 35%,
+            rgba(255,255,255,0) 65%);
+          animation: chromeSheen 2.2s linear infinite;
+          mix-blend-mode: screen;
+          opacity: .9;
+          pointer-events: none;
+        }
+        #building-modal .frame-1 { background: #6b7280; }
+        #building-modal .frame-2 { background: #065f46; }
+        #building-modal .frame-3 { background: #78350f; }
+        #building-modal .frame-4 { background: #94a3b8; }
+        #building-modal .frame-5 { background: #b45309; }
+        #building-modal .frame-6 {
+          background:
+            conic-gradient(from 0deg,
+              #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
+        }
+        #building-modal .frame-1.evo-on {
+          background: linear-gradient(135deg,#e5e7eb 0%, #9ca3af 45%, #f8fafc 60%, #6b7280 100%);
+        }
+        #building-modal .frame-2.evo-on {
+          background: linear-gradient(135deg,#34d399 0%, #16a34a 45%, #86efac 60%, #065f46 100%);
+        }
+        #building-modal .frame-3.evo-on {
+          background: linear-gradient(135deg,#f59e0b 0%, #b45309 45%, #fcd34d 60%, #78350f 100%);
+        }
+        #building-modal .frame-4.evo-on {
+          background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
+        }
+        #building-modal .frame-5.evo-on {
+          background: linear-gradient(135deg,#fde68a 0%, #f59e0b 45%, #fbbf24 60%, #b45309 100%);
+        }
+        #building-modal .frame-6max {
+          box-shadow:
+            inset 0 1px 6px rgba(0,0,0,.4),
+            0 0 18px rgba(255,255,255,.45),
+            0 0 28px rgba(59,130,246,.35);
+        }
+        @keyframes chromeSheen {
+          0% { transform: translateX(-30%) rotate(8deg); opacity: .1; }
+          50% { opacity: .9; }
+          100% { transform: translateX(30%) rotate(8deg); opacity: .1; }
+        }
+      </style>
+      <div class="${winClass}" style="
         width: min(520px, 94vw);
         background: #0b1222;
         color: #e5e7eb;
@@ -973,12 +2020,13 @@ class MainScene extends Phaser.Scene {
 
         <div style="margin-top:10px; display:grid; gap:8px; font-size:14px;">
           <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <div style="
-              width:140px;height:90px;display:flex;align-items:center;justify-content:center;
-              background:#0f172a;border:1px solid rgba(255,255,255,.08);border-radius:12px;
-            ">${previewSvg}</div>
+            <div id="previewFrame" class="preview-frame ${frameClass}">
+              <div id="previewInner" class="preview-inner${chromeClass}">
+                ${previewSvg}
+              </div>
+            </div>
             <div style="display:grid; gap:6px;">
-              <div>Rareza: <b>${stars}</b></div>
+          <div>Rareza: <b id="previewStars" class="preview-stars ${starClass}">${starsHtml}</b></div>
               <div>Tamaño: <b>${b.size}x${b.size}</b></div>
             </div>
           </div>
@@ -1026,6 +2074,24 @@ class MainScene extends Phaser.Scene {
             background:#ef4444;color:#fff;border:none;
             padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
           ">Eliminar</button>
+        </div>
+
+        <div style="margin-top:12px; display:grid; gap:8px; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px;">
+          <div class="evo-row">
+            <div id="evoDiamonds">${this.buildEvoDiamonds(b.evoLevel || 0)}</div>
+            <small id="evoHint" style="opacity:.8;">Evolución: ${b.evoLevel || 0}/5 (+${b.evoLevel || 0}%)</small>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="bldEvolve" style="
+              background:#fbbf24;color:#1f1400;border:none;
+              padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+            ">Evolucionar</button>
+            <button id="bldTrans" style="
+              background:#8b5cf6;color:#fff;border:none;
+              padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
+              display:none;
+            ">Transcender</button>
+          </div>
         </div>
 
         <small style="opacity:.75; display:block; margin-top:10px;">
@@ -1095,6 +2161,18 @@ class MainScene extends Phaser.Scene {
       this.setCursorMode();
     };
 
+    const evoBtn = modal.querySelector("#bldEvolve");
+    if (evoBtn) evoBtn.onclick = () => {
+      this.openEvolutionModal(b);
+    };
+    const transBtn = modal.querySelector("#bldTrans");
+    if (transBtn) transBtn.onclick = () => {
+      if (baseRarity !== 5) return;
+      if (b.evoStage === 5 && (b.evoLevel || 0) >= 5) {
+        this.transcendBuilding(b, def);
+      }
+    };
+
     modal.addEventListener("click", (e) => {
       if (e.target === modal) close();
     });
@@ -1109,7 +2187,9 @@ class MainScene extends Phaser.Scene {
 
   updateBuildingInfoModal(b, def, now) {
     const modal = document.getElementById("building-modal");
-    if (!modal || !b || this.selectedBuildingId !== b.id) return;
+    if (!modal || !b) return;
+    const modalId = Number(modal.dataset.buildingId);
+    if (Number.isFinite(modalId) && modalId !== b.id) return;
 
     const buildSection = modal.querySelector("#buildSection");
     const prodSection = modal.querySelector("#prodSection");
@@ -1118,12 +2198,33 @@ class MainScene extends Phaser.Scene {
     const buildTime = modal.querySelector("#buildTime");
     const prodTime = modal.querySelector("#prodTime");
     const collectBtn = modal.querySelector("#bldCollect");
+    const evoDiamonds = modal.querySelector("#evoDiamonds");
+    const evoHint = modal.querySelector("#evoHint");
+    const evoBtn = modal.querySelector("#bldEvolve");
+    const transBtn = modal.querySelector("#bldTrans");
+    const previewFrame = modal.querySelector("#previewFrame");
+    const previewInner = modal.querySelector("#previewInner");
+    const previewStars = modal.querySelector("#previewStars");
+    const win = modal.querySelector(".building-window");
+
+    const baseRarity = this.getRarityForKey(def.key || b.typeKey);
+    const evoLevel = Math.max(0, Math.min(5, b.evoLevel || 0));
+    const evoStage = (typeof b.evoStage === "number")
+      ? b.evoStage
+      : (baseRarity === 5 ? 5 : 0);
+    const displayRarity = (baseRarity === 5 && evoStage >= 6) ? 6 : baseRarity;
+    const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const frameClass = displayRarity === 6
+      ? `preview-frame frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
+      : `preview-frame frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? "preview-inner chrome" : "preview-inner";
+    const starClass = (displayRarity === 6) ? "stars-6" : (displayRarity === 5 ? "stars-5" : "stars-base");
 
     if (!b.isBuilt) {
       if (buildSection) buildSection.style.display = "block";
       if (prodSection) prodSection.style.display = "none";
 
-      const total = def.buildSeconds * 1000;
+      const total = (b.buildSeconds ?? def.buildSeconds) * 1000;
       const remain = Math.max(0, b.buildEnd - now);
       const done = total > 0 ? (1 - (remain / total)) : 1;
 
@@ -1159,6 +2260,54 @@ class MainScene extends Phaser.Scene {
         collectBtn.setAttribute("disabled", "true");
       }
     }
+
+    if (previewStars) {
+      if (displayRarity === 6) {
+        previewStars.innerHTML = Array.from({ length: 6 }, (_, i) => (
+          `<span class="star star-6" style="--h:${i * 60}deg">★</span>`
+        )).join("");
+      } else {
+        previewStars.textContent = "★".repeat(displayRarity);
+      }
+      const starsCls = `preview-stars ${starClass}`;
+      if (previewStars.className !== starsCls) previewStars.className = starsCls;
+    }
+    if (previewFrame && previewFrame.className !== frameClass) previewFrame.className = frameClass;
+    if (previewInner && previewInner.className !== chromeClass) previewInner.className = chromeClass;
+    if (win) {
+      const winCls = `building-window win-${displayRarity}${evoActive ? " evo-on" : ""}${(displayRarity === 6 && evoLevelClamped >= 5) ? " win-6max" : ""}`;
+      if (win.className !== winCls) win.className = winCls;
+    }
+
+    const evoLevelClamped = Math.max(0, Math.min(5, b.evoLevel || 0));
+    const totalEvo = (evoStage >= 6) ? (5 + evoLevelClamped) : evoLevelClamped;
+    if (evoDiamonds) evoDiamonds.innerHTML = this.buildEvoDiamonds(evoLevelClamped);
+    if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}★: ${evoLevelClamped}/5 (+${totalEvo}%)`;
+    if (evoBtn) {
+      if (!b.isBuilt) {
+        evoBtn.setAttribute("disabled", "true");
+        evoBtn.textContent = "En construcción";
+      } else if (baseRarity < 5) {
+        evoBtn.setAttribute("disabled", "true");
+        evoBtn.textContent = "Solo 5★";
+      } else if (evoStage >= 6 && evoLevelClamped >= 5) {
+        evoBtn.setAttribute("disabled", "true");
+        evoBtn.textContent = "Max";
+      } else {
+        evoBtn.removeAttribute("disabled");
+        evoBtn.textContent = "Evolucionar";
+      }
+    }
+    if (transBtn) {
+      const ready = (b.isBuilt && baseRarity === 5 && evoStage === 5 && evoLevelClamped >= 5);
+      if (ready) {
+        transBtn.style.display = "inline-block";
+        transBtn.removeAttribute("disabled");
+      } else {
+        transBtn.style.display = "none";
+        transBtn.setAttribute("disabled", "true");
+      }
+    }
   }
 
   rotateSelected() {
@@ -1170,11 +2319,12 @@ class MainScene extends Phaser.Scene {
 
     b.rotationStep = ((b.rotationStep || 0) + 1) % 4;
 
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     const borders = [0x22c55e, 0x60a5fa, 0xf59e0b, 0xf472b6];
     b.border = borders[b.rotationStep];
 
     b.gfx.clear();
-    this.drawCells(b.gfx, b.cells, 0x22c55e, 0.85, b.border);
+    this.drawCells(b.gfx, b.cells, def.fill, 0.85, b.border);
   }
 
   // ===== Move with orange/red ghost =====
@@ -1229,8 +2379,9 @@ class MainScene extends Phaser.Scene {
     b.rotationStep = mm.rotationStep;
     b.border = mm.border;
 
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     b.gfx.clear();
-    this.drawCells(b.gfx, b.cells, 0x22c55e, 0.85, b.border);
+    this.drawCells(b.gfx, b.cells, def.fill, 0.85, b.border);
     b.gfx.setVisible(true);
 
     this.moveGhost.clear();
@@ -1249,8 +2400,9 @@ class MainScene extends Phaser.Scene {
       b.border = border;
       b.rotationStep = rotationStep;
 
+      const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
       b.gfx.clear();
-      this.drawCells(b.gfx, b.cells, 0x22c55e, 0.85, border);
+      this.drawCells(b.gfx, b.cells, def.fill, 0.85, border);
       b.gfx.setVisible(true);
     }
 
@@ -1290,11 +2442,13 @@ class MainScene extends Phaser.Scene {
     if (!b || !b.rewardReady) return;
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
-    const reward = def.reward || { exp: 0, gold: 0 };
+    const reward = b.reward || def.reward || { exp: 0, gold: 0 };
+    const gold = Math.max(0, Math.round(reward.gold));
+    const exp = Math.max(0, Math.round(reward.exp));
 
     if (this.economy) {
-      this.economy.addGold(reward.gold);
-      this.economy.addExp(reward.exp);
+      this.economy.addGold(gold);
+      this.economy.addExp(exp);
     }
 
     b.rewardReady = false;
@@ -1303,14 +2457,23 @@ class MainScene extends Phaser.Scene {
     b.rewardExpIcon?.setVisible(false);
   }
 
-  placeBuilding(r0, c0, sizeIgnored) {
+  placeBuilding(r0, c0) {
     // 👇 construir usando el item seleccionado
     const typeKey = this.selectedBuildKey || "green_1";
     const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
 
-    const size = (typeKey === "green_1" && typeof sizeIgnored === "number" && sizeIgnored > 0)
-      ? sizeIgnored
-      : def.size;
+    const size = def.size;
+    const rarity = this.getRarityForKey(typeKey);
+    const mods = RARITY_MODS[rarity] || RARITY_MODS[2];
+    const baseBuild = def.buildSeconds ?? 0;
+    const baseProd = def.prodSeconds ?? 0;
+    const baseReward = def.reward || { exp: 0, gold: 0 };
+    const effBuild = Math.max(0, Math.round(baseBuild * mods.build));
+    const effProd = Math.max(1, Math.round(baseProd * mods.prod));
+    const effReward = {
+      exp: Math.max(0, Math.round(baseReward.exp * mods.reward)),
+      gold: Math.max(0, Math.round(baseReward.gold * mods.reward))
+    };
 
     // validar espacio
     if (!canPlace(size, r0, c0)) return;
@@ -1330,7 +2493,7 @@ class MainScene extends Phaser.Scene {
 
     // base gfx (tiles)
     const gfx = this.add.graphics();
-    const isInstant = def.buildSeconds <= 0;
+    const isInstant = effBuild <= 0;
     const ghostAlpha = isInstant ? 0.85 : 0.25;
     const ghostBorder = isInstant ? def.border : 0x64748b;
     this.drawCells(gfx, cells, def.fill, ghostAlpha, ghostBorder);
@@ -1386,8 +2549,8 @@ class MainScene extends Phaser.Scene {
 
     // tiempos
     const now = Date.now();
-    const buildEnd = now + def.buildSeconds * 1000;
-    const prodCycle = def.prodSeconds * 1000;
+    const buildEnd = now + effBuild * 1000;
+    const prodCycle = effProd * 1000;
 
     buildings.set(id, {
       id,
@@ -1401,10 +2564,18 @@ class MainScene extends Phaser.Scene {
       rewardExpIcon,
       rewardReady: false,
       glowGfx,
-      isBuilt: def.buildSeconds <= 0,
+      isBuilt: effBuild <= 0,
+      buildSeconds: effBuild,
+      prodSeconds: effProd,
+      reward: effReward,
+      baseBuildSeconds: effBuild,
+      baseProdSeconds: effProd,
+      baseReward: { ...effReward },
+      evoLevel: 0,
+      evoStage: (rarity >= 5) ? 5 : 0,
       buildEnd,
       prodCycle,
-      prodStart: def.buildSeconds <= 0 ? now : buildEnd, // empieza cuando termina de construir
+      prodStart: effBuild <= 0 ? now : buildEnd, // empieza cuando termina de construir
       lastRewardAt: 0,
       border: def.border
     });
@@ -1516,7 +2687,7 @@ class MainScene extends Phaser.Scene {
 
       // ===== Construcción =====
       if (!b.isBuilt) {
-        const total = def.buildSeconds * 1000;
+        const total = (b.buildSeconds ?? def.buildSeconds) * 1000;
         const remain = Math.max(0, b.buildEnd - now);
         const done = 1 - (remain / total);
 
@@ -1550,11 +2721,11 @@ class MainScene extends Phaser.Scene {
       }
 
       // ===== Producción =====
-      const cycle = b.prodCycle;
-      let p01 = 0;
+    const cycle = b.prodCycle;
+    let p01 = 0;
 
-      if (!b.rewardReady) {
-        const elapsed = now - b.prodStart;
+    if (!b.rewardReady) {
+        const elapsed = (now - b.prodStart);
         if (cycle <= 0) {
           p01 = 1;
           b.rewardReady = true;

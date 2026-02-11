@@ -3,7 +3,7 @@
 // - Oro + Level/EXP con barra
 // - Deseos separados (Perm / Lim)
 // - Modal Gachapon con animación (abrir/cerrar)
-// - Banner Permanente: items 4★ (Azul/Rojo/Amarillo)
+// - Banner Permanente: 4★ (Verde/Rojo/Azul 4x4) y 5★ (Verde/Rojo/Azul 9x9)
 // - DEV buttons: +10 Perm / +10 Lim
 // - Inventario básico (se muestra en modal)
 // - No gasta tickets ni da oro/exp por tirar deseos (solo da items).
@@ -13,13 +13,21 @@ const MAX_LEVEL = 100;
 
 // ===== ITEMS (lo que “sale” del gachapon / banner) =====
 const ITEM_DEFS = {
-  // ===== PERMANENTE (4★) =====
-  perm_blue_9:   { key: "perm_blue_9",   name: "Azul 9x9",      icon: "🟦", size: 9, rarity: 4 },
-  perm_red_1:    { key: "perm_red_1",    name: "Rojo 1x1",      icon: "🟥", size: 1, rarity: 4 },
-  perm_yellow_4: { key: "perm_yellow_4", name: "Amarillo 4x4",  icon: "🟨", size: 4, rarity: 4 },
-
-  // ===== VERDE (2★ mínimo) =====
-  green_1:       { key: "green_1",       name: "Verde 1x1",     icon: "🟩", size: 1, rarity: 2 },
+  // ===== VERDE (1★/2★/3★) =====
+  green_1:       { key: "green_1",       name: "Verde 1x1",     icon: "🟩", size: 1, rarity: 1 },
+  green_2:       { key: "green_2",       name: "Verde 2x2",     icon: "🟩", size: 2, rarity: 2 },
+  green_3:       { key: "green_3",       name: "Verde 3x3",     icon: "🟩", size: 3, rarity: 3 },
+  green_4:       { key: "green_4",       name: "Verde 4x4",     icon: "🟩✨", size: 4, rarity: 4 },
+  // ===== ROJO (1★/2★/3★/4★) =====
+  red_1:         { key: "red_1",         name: "Rojo 1x1",      icon: "🟥", size: 1, rarity: 1 },
+  red_2:         { key: "red_2",         name: "Rojo 2x2",      icon: "🟥", size: 2, rarity: 2 },
+  red_3:         { key: "red_3",         name: "Rojo 3x3",      icon: "🟥", size: 3, rarity: 3 },
+  red_4:         { key: "red_4",         name: "Rojo 4x4",      icon: "🟥✨", size: 4, rarity: 4 },
+  // ===== AZUL (1★/2★/3★/4★) =====
+  blue_1:        { key: "blue_1",        name: "Azul 1x1",      icon: "🟦", size: 1, rarity: 1 },
+  blue_2:        { key: "blue_2",        name: "Azul 2x2",      icon: "🟦", size: 2, rarity: 2 },
+  blue_3:        { key: "blue_3",        name: "Azul 3x3",      icon: "🟦", size: 3, rarity: 3 },
+  blue_4:        { key: "blue_4",        name: "Azul 4x4",      icon: "🟦✨", size: 4, rarity: 4 },
 
   // ===== 5★ permanente =====
   perm_green_9:  {
@@ -34,18 +42,37 @@ const ITEM_DEFS = {
     cardBg2: "#052e1b",
     cardAccent: "#22c55e"
   },
-
-  // ===== LIMITADO (4★) =====
-  lim_blue_2:    { key: "lim_blue_2",    name: "Azul 2x2",      icon: "🟦", size: 2, rarity: 4 },
-  lim_red_2:     { key: "lim_red_2",     name: "Rojo 2x2",      icon: "🟥", size: 2, rarity: 4 },
-  lim_yellow_2:  { key: "lim_yellow_2",  name: "Amarillo 2x2",  icon: "🟨", size: 2, rarity: 4 },
+  perm_blue_9:  {
+    key: "perm_blue_9",
+    name: "Azul 9x9",
+    icon: "🟦✨",
+    size: 9,
+    rarity: 5,
+    cardTag: "Marea Celeste",
+    cardSigil: "🌊",
+    cardBg1: "#0b2a4a",
+    cardBg2: "#0b1222",
+    cardAccent: "#38bdf8"
+  },
+  perm_red_9:  {
+    key: "perm_red_9",
+    name: "Rojo 9x9",
+    icon: "🟥✨",
+    size: 9,
+    rarity: 5,
+    cardTag: "Corazón Ígneo",
+    cardSigil: "🔥",
+    cardBg1: "#3b0a0a",
+    cardBg2: "#2b0606",
+    cardAccent: "#ef4444"
+  },
 
   // ===== 5★ limitado =====
   lim_gold_2:    {
     key: "lim_gold_2",
-    name: "Dorado 2x2",
+    name: "Dorado 9x9",
     icon: "🟨✨",
-    size: 2,
+    size: 9,
     rarity: 5,
     cardTag: "Sol Dorado",
     cardSigil: "☀️",
@@ -59,6 +86,7 @@ class EconomySystem {
   constructor(scene) {
     this.scene = scene;
     this.isWishAnimating = false;
+    this.audioCtx = null;
 
     // ===== Valores base =====
     this.gold = 1000;
@@ -73,7 +101,12 @@ class EconomySystem {
 
     // ===== Inventario de items =====
     // { itemKey: count }
-    this.inventory = {};
+    this.inventory = {
+      green_1: 5,
+      green_2: 3,
+      green_3: 2,
+      green_4: 1
+    };
 
     // ===== Pity / garantías =====
     // 4★: garantizado cada 10 (base 8%)
@@ -91,6 +124,7 @@ class EconomySystem {
     this.createUI();
     this.refreshUI();
     this.ensureInventoryButton();
+    this.ensureAdminButton();
 
     // ===== Banner Permanente: sin barra de carga (se quitó el ciclo) =====
   }
@@ -140,6 +174,83 @@ class EconomySystem {
     this.updateModalCounts?.();
   }
 
+  ensureAudio() {
+    if (this.audioCtx) {
+      if (this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+      return;
+    }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    this.audioCtx = new Ctx();
+    if (this.audioCtx.state === "suspended") {
+      this.audioCtx.resume().catch(() => {});
+    }
+  }
+
+  playStarSound(rarity) {
+    this.ensureAudio();
+    const ctx = this.audioCtx;
+    if (!ctx || ctx.state !== "running") return;
+
+    const now = ctx.currentTime;
+    const base = (rarity >= 5) ? 880 : (rarity >= 4 ? 660 : (rarity >= 3 ? 520 : (rarity >= 2 ? 440 : 360)));
+    const dur = (rarity >= 5) ? 0.5 : (rarity >= 4 ? 0.35 : 0.25);
+    const peak = (rarity >= 5) ? 0.18 : (rarity >= 4 ? 0.14 : 0.1);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(peak, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(base, now);
+    osc1.frequency.exponentialRampToValueAtTime(base * 1.08, now + dur * 0.7);
+
+    osc1.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + dur + 0.02);
+
+    if (rarity >= 4) {
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(0.0001, now);
+      gain2.gain.linearRampToValueAtTime(peak * 0.6, now + 0.02);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = "triangle";
+      osc2.frequency.setValueAtTime(base * 2, now);
+      osc2.frequency.exponentialRampToValueAtTime(base * 2.1, now + dur * 0.7);
+
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+
+      osc2.start(now);
+      osc2.stop(now + dur + 0.02);
+    }
+
+    if (rarity >= 5) {
+      const chimeAt = now + 0.18;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, chimeAt);
+      g.gain.linearRampToValueAtTime(peak * 0.5, chimeAt + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, chimeAt + 0.25);
+
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(base * 1.5, chimeAt);
+      o.frequency.exponentialRampToValueAtTime(base * 1.6, chimeAt + 0.2);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(chimeAt);
+      o.stop(chimeAt + 0.27);
+    }
+  }
+
   consumeItem(key, n = 1) {
     this.inventory = this.inventory || {};
     const cur = this.inventory[key] || 0;
@@ -161,6 +272,77 @@ class EconomySystem {
     btn.textContent = "Inventario";
     btn.addEventListener("click", () => this.openInventoryModal());
     document.body.appendChild(btn);
+  }
+
+  ensureAdminButton() {
+    if (document.getElementById("adminBtn")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "adminBtn";
+    btn.className = "admin-btn";
+    btn.textContent = "Admin";
+    btn.addEventListener("click", () => this.openAdminModal());
+    document.body.appendChild(btn);
+  }
+
+  openAdminModal() {
+    if (document.getElementById("admin-modal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "admin-modal";
+    modal.className = "inv-modal";
+    modal.innerHTML = `
+      <div class="inv-card admin-card">
+        <div class="inv-header">
+          <div class="inv-title">Admin Items</div>
+          <button id="adminClose" class="inv-x">✖</button>
+        </div>
+        <div id="adminList" class="inv-list admin-list"></div>
+        <small class="inv-hint">Toca un item para añadirlo al inventario.</small>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      if (modal.parentNode) modal.remove();
+    };
+
+    modal.querySelector("#adminClose").onclick = close;
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) close();
+    });
+
+    this.renderAdminList(modal.querySelector("#adminList"));
+  }
+
+  renderAdminList(listEl) {
+    if (!listEl) return;
+    const keys = Object.keys(ITEM_DEFS);
+    const rows = keys.map((k) => {
+      const def = ITEM_DEFS[k];
+      const c = this.inventory[k] || 0;
+      return `
+        <button class="inv-row" data-admin="${k}">
+          <span class="inv-left">
+            <span class="inv-name">${def.icon || "❖"} ${def.name || k}</span>
+            <span class="inv-meta">${def.size}x${def.size} • ${def.rarity}★ • en inv: ${c}</span>
+          </span>
+          <span class="inv-count">+1</span>
+        </button>
+      `;
+    });
+
+    listEl.innerHTML = rows.join("");
+
+    listEl.querySelectorAll("[data-admin]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-admin");
+        if (!key) return;
+        this.addItem(key, 1);
+        this.renderAdminList(listEl);
+      });
+    });
   }
 
   openInventoryModal() {
@@ -267,7 +449,7 @@ class EconomySystem {
       .setScrollFactor(0)
       .setDepth(9999);
 
-    this.expBarFill = s.add.rectangle(0, 30, 0, 8, 0x22c55e)
+    this.expBarFill = s.add.rectangle(0, 30, 140, 8, 0x22c55e)
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(10000);
@@ -324,6 +506,18 @@ class EconomySystem {
       .setInteractive({ useHandCursor: true })
       .setDepth(9999);
 
+    this.devExpBtn = s.add.text(0, 52, "+50 EXP (DEV)", {
+      fontFamily: "Arial",
+      fontSize: "12px",
+      color: "#022c22",
+      backgroundColor: "#38bdf8"
+    })
+      .setOrigin(1, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
     // Click: abrir modal
     this.gachaBtn.on("pointerdown", (pointer) => {
       s.uiGuard?.(pointer);
@@ -345,6 +539,11 @@ class EconomySystem {
       this.updateModalCounts();
     });
 
+    this.devExpBtn.on("pointerdown", (pointer) => {
+      s.uiGuard?.(pointer);
+      this.addExp(50);
+    });
+
     // Layout inicial
     this.layoutHorizontal();
 
@@ -359,7 +558,8 @@ class EconomySystem {
       this.limitedWishText,
       this.gachaBtn,
       this.devPermBtn,
-      this.devLimitedBtn
+      this.devLimitedBtn,
+      this.devExpBtn
     ];
 
     if (Array.isArray(s.uiObjects)) {
@@ -399,11 +599,15 @@ class EconomySystem {
     apply(this.gachaBtn, fontSize, padX + 2, padY);
     apply(this.devPermBtn, smallFont, padX, Math.max(3, padY - 1));
     apply(this.devLimitedBtn, smallFont, padX, Math.max(3, padY - 1));
+    apply(this.devExpBtn, smallFont, padX, Math.max(3, padY - 1));
 
     this.expBarWidth = isTiny ? 100 : (isCompact ? 120 : 140);
     this.expBarBg.width = this.expBarWidth;
+    this.expBarBg.setOrigin(1, 0);
+    this.expBarFill.width = this.expBarWidth;
+    this.expBarFill.setOrigin(1, 0);
     const ratio = (this.level >= MAX_LEVEL) ? 1 : ((this.expToNext <= 0) ? 0 : (this.exp / this.expToNext));
-    this.expBarFill.width = this.expBarWidth * Phaser.Math.Clamp(ratio, 0, 1);
+    this.setExpBarRatio(ratio);
 
     if (!isCompact) {
       // fila superior (derecha -> izquierda)
@@ -435,8 +639,11 @@ class EconomySystem {
       this.expText.y = top + 40;
 
       // DEV buttons (abajo, derecha)
-      this.devLimitedBtn.x = right;
-      this.devLimitedBtn.y = top + 68;
+      this.devExpBtn.x = right;
+      this.devExpBtn.y = top + 68;
+
+      this.devLimitedBtn.x = this.devExpBtn.x - (this.devExpBtn.width + 10);
+      this.devLimitedBtn.y = this.devExpBtn.y;
 
       this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 10);
       this.devPermBtn.y = this.devLimitedBtn.y;
@@ -478,11 +685,20 @@ class EconomySystem {
     });
 
     const devY = row2Y + 26;
-    this.devLimitedBtn.x = right;
-    this.devLimitedBtn.y = devY;
+    this.devExpBtn.x = right;
+    this.devExpBtn.y = devY;
+
+    this.devLimitedBtn.x = this.devExpBtn.x - (this.devExpBtn.width + 8);
+    this.devLimitedBtn.y = this.devExpBtn.y;
 
     this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 8);
     this.devPermBtn.y = this.devLimitedBtn.y;
+  }
+
+  setExpBarRatio(value) {
+    const clamped = Phaser.Math.Clamp(value, 0, 1);
+    this.expBarFill.scaleX = clamped;
+    this.expBarFill.scaleY = 1;
   }
 
   refreshUI() {
@@ -498,12 +714,12 @@ class EconomySystem {
     const next = this.expToNext;
 
     if (this.level >= MAX_LEVEL) {
-      this.expBarFill.width = this.expBarWidth || 140;
+      this.setExpBarRatio(1);
       this.expText.setText(`EXP: MAX`);
     } else {
       this.expText.setText(`EXP: ${cur}/${next}`);
       const ratio = (next <= 0) ? 0 : (cur / next);
-      this.expBarFill.width = (this.expBarWidth || 140) * Phaser.Math.Clamp(ratio, 0, 1);
+      this.setExpBarRatio(ratio);
     }
 
     // si cambió el texto, recalcula layout (por anchos)
@@ -553,12 +769,23 @@ class EconomySystem {
     let rarity = 2;
 
     // 5★: 2% o garantía a los 50
-    const hit5 = (Phaser.Math.FloatBetween(0, 1) < 0.02) || (pity5 >= 50);
+    const hit5 = (Phaser.Math.FloatBetween(0, 1) < 0.006) || (pity5 >= 50);
     if (hit5) rarity = 5;
     else {
       // 4★: garantía cada 10 (y una chance base)
       const hit4 = (Phaser.Math.FloatBetween(0, 1) < 0.08) || (pity4 >= 10);
       if (hit4) rarity = 4;
+      else if (!isLimited) {
+        // permanente: 1★/2★/3★ = 40% / 30% / 30%
+        const r = Phaser.Math.FloatBetween(0, 1);
+        if (r < 0.40) rarity = 1;
+        else if (r < 0.70) rarity = 2;
+        else rarity = 3;
+      } else {
+        // limitado: sin 1★ -> 3★ 70% / 2★ 30%
+        const r = Phaser.Math.FloatBetween(0, 1);
+        rarity = (r < 0.70) ? 3 : 2;
+      }
     }
 
     // reset pity según rarity
@@ -574,14 +801,24 @@ class EconomySystem {
     }
 
     // --- decide itemKey según banner + rareza ---
-    let itemKey = "green_1"; // 2★
+    let itemKey = "green_1"; // base
+    if (rarity === 1) {
+      const pool = ["green_1", "red_1", "blue_1"];
+      itemKey = pool[Phaser.Math.Between(0, pool.length - 1)];
+    } else if (rarity === 2) {
+      const pool = ["green_2", "red_2", "blue_2"];
+      itemKey = pool[Phaser.Math.Between(0, pool.length - 1)];
+    } else if (rarity === 3) {
+      const pool = ["green_3", "red_3", "blue_3"];
+      itemKey = pool[Phaser.Math.Between(0, pool.length - 1)];
+    }
 
     if (rarity === 4) {
       if (isLimited) {
-        const pool = ["lim_blue_2", "lim_red_2", "lim_yellow_2"];
+        const pool = ["green_4", "red_4", "blue_4"];
         itemKey = pool[Phaser.Math.Between(0, pool.length - 1)];
       } else {
-        const pool = ["perm_blue_9", "perm_red_1", "perm_yellow_4"];
+        const pool = ["green_4", "red_4", "blue_4"];
         itemKey = pool[Phaser.Math.Between(0, pool.length - 1)];
       }
     }
@@ -657,6 +894,7 @@ class EconomySystem {
         --bg-top: #3b0a0a;
         --bg-bottom: #0b1222;
         --textile-img: none;
+        --andean-pattern: url("data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='120'%20height='40'%20viewBox='0%200%20120%2040'%3E%3Cpath%20d='M0%2020%20L20%200%20L40%2020%20L60%200%20L80%2020%20L100%200%20L120%2020'%20fill='none'%20stroke='%23f59e0b'%20stroke-width='4'/%3E%3Cpath%20d='M0%2030%20L20%2010%20L40%2030%20L60%2010%20L80%2030%20L100%2010%20L120%2030'%20fill='none'%20stroke='%23f97316'%20stroke-width='3'/%3E%3C/svg%3E");
         --btn-bg: #7f1d1d;
         --btn-text: #fef3c7;
         --stage-border: rgba(250,204,21,.18);
@@ -745,6 +983,126 @@ class EconomySystem {
         --glow-anim: .5s;
         --label-anim: .4s;
       }
+      .gacha-stage.prelude {
+        align-items: stretch;
+        justify-content: stretch;
+      }
+      .gacha-prelude {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 14px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 30%, rgba(14,165,233,.25), rgba(2,6,23,.85) 70%),
+          linear-gradient(180deg, rgba(15,23,42,.85), rgba(2,6,23,.95));
+      }
+      .gacha-prelude::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: var(--andean-pattern);
+        background-size: 120px 40px;
+        opacity: .18;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+      .prelude-sky {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(255,255,255,.15), rgba(255,255,255,0) 40%),
+          radial-gradient(circle at 80% 35%, rgba(255,255,255,.1), rgba(255,255,255,0) 45%);
+        opacity: .8;
+      }
+      .prelude-motif {
+        position: absolute;
+        left: 12%;
+        bottom: 18%;
+        width: 76%;
+        height: 12%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(251,191,36,.15), rgba(248,113,113,.2), rgba(59,130,246,.2));
+        box-shadow: 0 0 20px rgba(251,191,36,.2);
+        opacity: .8;
+      }
+      .prelude-streaks {
+        position: absolute;
+        inset: 0;
+      }
+      .prelude-aura {
+        position: absolute;
+        inset: -15%;
+        opacity: .35;
+        filter: blur(2px);
+        animation: auraPulse 1.4s ease forwards;
+        pointer-events: none;
+      }
+      .prelude-aura.rarity-3 {
+        background: radial-gradient(circle at 50% 50%, rgba(94,234,212,.5), rgba(94,234,212,0) 70%);
+      }
+      .prelude-aura.rarity-4 {
+        background: radial-gradient(circle at 50% 50%, rgba(192,132,252,.7), rgba(192,132,252,0) 72%);
+      }
+      .prelude-aura.rarity-5 {
+        background: radial-gradient(circle at 50% 50%, rgba(245,158,11,.85), rgba(245,158,11,0) 75%);
+      }
+      .prelude-streak {
+        position: absolute;
+        left: -40%;
+        top: var(--y, 40%);
+        width: 70%;
+        height: 3px;
+        background: rgba(125,211,252,.7);
+        box-shadow: 0 0 16px rgba(125,211,252,.8);
+        transform: rotate(-12deg);
+        opacity: 0;
+        animation: streakFly 1.3s ease forwards;
+        animation-delay: var(--d, 0s);
+      }
+      .gacha-prelude.single .prelude-streak {
+        width: 90%;
+        height: 3px;
+        box-shadow: 0 0 18px rgba(125,211,252,.9);
+      }
+      .prelude-streak::after {
+        content: "";
+        position: absolute;
+        right: -8px;
+        top: -3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.9);
+        box-shadow: 0 0 12px rgba(255,255,255,.8);
+      }
+      .prelude-streak.rarity-3 {
+        background: rgba(94,234,212,.85);
+        box-shadow: 0 0 16px rgba(94,234,212,.85);
+      }
+      .prelude-streak.rarity-4 {
+        background: rgba(192,132,252,1);
+        box-shadow: 0 0 18px rgba(192,132,252,1);
+      }
+      .prelude-streak.rarity-5 {
+        background: rgba(245,158,11,1);
+        box-shadow: 0 0 22px rgba(245,158,11,1);
+      }
+      .prelude-badge {
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: .5px;
+        font-size: 12px;
+        background: rgba(15,23,42,.75);
+        border: 1px solid rgba(255,255,255,.2);
+      }
+      .prelude-badge.purple { color: #c084fc; border-color: rgba(192,132,252,.6); }
+      .prelude-badge.gold { color: #fbbf24; border-color: rgba(245,158,11,.7); }
+
       .gacha-stage::before { content: none; }
       .gacha-stage::after { content: none; }
       .envelope {
@@ -858,8 +1216,23 @@ class EconomySystem {
         font-weight: 700;
       }
       .card-stars {
+        display: inline-flex;
+        gap: 2px;
         letter-spacing: 1px;
         opacity: .9;
+      }
+      .card-stars .star {
+        opacity: 0;
+        transform: translateY(6px) scale(.85);
+      }
+      .card-stars.stars-1 { --star-anim: .25s; }
+      .card-stars.stars-2 { --star-anim: .3s; }
+      .card-stars.stars-3 { --star-anim: .35s; }
+      .card-stars.stars-4 { --star-anim: .4s; }
+      .card-stars.stars-5 { --star-anim: .45s; }
+      .gacha-stage.reveal .card-stars .star {
+        animation: starPop var(--star-anim, .35s) ease forwards;
+        animation-delay: var(--sd, 0s);
       }
       .glow {
         position: absolute;
@@ -908,24 +1281,43 @@ class EconomySystem {
       .card-label.rarity-2 { color: #cbd5f5; }
       .card-label.rarity-4 { color: #c084fc; }
       .card-label.rarity-5 { color: #fbbf24; }
+      .tap-hint {
+        position: absolute;
+        bottom: 12px;
+        right: 14px;
+        font-size: 12px;
+        letter-spacing: .5px;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity .2s ease, transform .2s ease;
+        color: rgba(226,232,240,.9);
+      }
+      .gacha-stage.await .tap-hint {
+        opacity: .95;
+        transform: translateY(0);
+      }
 
       .reveal-flash {
         position: absolute;
         inset: -20%;
-        background: radial-gradient(circle at center, rgba(255,255,255,.9), rgba(255,255,255,0) 55%);
+        background:
+          radial-gradient(circle at center, rgba(255,255,255,1), rgba(255,255,255,.7) 35%, rgba(255,255,255,0) 75%);
         opacity: 0;
         z-index: 4;
         pointer-events: none;
         mix-blend-mode: screen;
+        filter: blur(1px);
       }
       .reveal-flash.rarity-4 {
-        background: radial-gradient(circle at center, rgba(192,132,252,.9), rgba(192,132,252,0) 60%);
+        background:
+          radial-gradient(circle at center, rgba(192,132,252,1), rgba(192,132,252,.7) 38%, rgba(192,132,252,0) 78%);
       }
       .reveal-flash.rarity-5 {
-        background: radial-gradient(circle at center, rgba(245,158,11,.95), rgba(245,158,11,0) 60%);
+        background:
+          radial-gradient(circle at center, rgba(245,158,11,1), rgba(245,158,11,.8) 40%, rgba(245,158,11,0) 80%);
       }
       .gacha-stage.reveal .reveal-flash {
-        animation: revealFlash .35s ease forwards;
+        animation: revealFlash .9s ease forwards;
       }
 
       .gacha-results {
@@ -944,6 +1336,10 @@ class EconomySystem {
         border-radius: 12px;
         padding: 10px;
         overflow: hidden;
+        opacity: 0;
+        transform: translateY(8px) scale(.98);
+        animation: resultIn .45s ease forwards;
+        animation-delay: calc(var(--i, 0) * 0.07s);
       }
       .result-icon { font-size: 22px; }
       .result-name { font-weight: 700; }
@@ -993,6 +1389,7 @@ class EconomySystem {
         .gacha-anim-title { font-size: 16px; }
         .gacha-anim-btn { padding: 6px 10px; font-size: 12px; }
         .gacha-stage { height: 200px; }
+        .gacha-prelude::after { background-size: 90px 30px; }
         .card-anim { width: 120px; height: 170px; }
         .envelope { width: 160px; height: 105px; }
         .glow { width: 200px; height: 200px; }
@@ -1025,8 +1422,29 @@ class EconomySystem {
       }
       @keyframes revealFlash {
         0% { opacity: 0; transform: scale(.9); }
-        30% { opacity: 1; transform: scale(1); }
-        100% { opacity: 0; transform: scale(1.08); }
+        20% { opacity: 1; transform: scale(1.02); }
+        60% { opacity: .95; transform: scale(1.08); }
+        100% { opacity: 0; transform: scale(1.24); }
+      }
+      @keyframes auraPulse {
+        0% { opacity: .2; transform: scale(.92); }
+        40% { opacity: .8; transform: scale(1.02); }
+        100% { opacity: 0; transform: scale(1.12); }
+      }
+      @keyframes resultIn {
+        0% { opacity: 0; transform: translateY(10px) scale(.96); }
+        60% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes starPop {
+        0% { opacity: 0; transform: translateY(6px) scale(.85); }
+        60% { opacity: 1; transform: translateY(-2px) scale(1.05); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes streakFly {
+        0% { opacity: 0; transform: translateX(-20%) rotate(-12deg); }
+        35% { opacity: 1; }
+        100% { opacity: 0; transform: translateX(160%) rotate(-12deg); }
       }
       @keyframes neonFlicker {
         0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: .95; }
@@ -1046,9 +1464,12 @@ class EconomySystem {
 
   renderWishStageHTML(result) {
     const def = ITEM_DEFS[result.itemKey] || { name: result.itemKey, icon: "❓", rarity: result.rarity };
-    const stars = "★".repeat(result.rarity || def.rarity || 2);
-    const rarityClass = `rarity-${result.rarity || def.rarity || 2}`;
-    const isLegend = (result.rarity || def.rarity || 2) === 5;
+    const rarity = result.rarity || def.rarity || 2;
+    const rarityClass = `rarity-${rarity}`;
+    const isLegend = rarity === 5;
+    const starSpans = Array.from({ length: rarity }, (_, i) => (
+      `<span class="star" style="--sd:${(i * 0.12).toFixed(2)}s">★</span>`
+    )).join("");
     const cardTag = def.cardTag || "";
     const cardSigil = def.cardSigil || "";
     const cardStyleParts = [];
@@ -1071,13 +1492,37 @@ class EconomySystem {
           ${cardSigil ? `<div class="card-sigil">${cardSigil}</div>` : `<div class="card-icon">${def.icon || "❓"}</div>`}
           <div class="card-name">${def.name || result.itemKey}</div>
           ${cardTag ? `<div class="card-tag">${cardTag}</div>` : ""}
-          <div class="card-stars">${stars}</div>
+          <div class="card-stars stars-${rarity}">${starSpans}</div>
         </div>
       </div>
       <div class="glow ${rarityClass}"></div>
       ${isLegend ? `<div class="legend-shine"></div>` : ""}
       <div class="reveal-flash ${rarityClass}"></div>
       <div class="card-label ${rarityClass}">${def.name || result.itemKey}</div>
+      <div class="tap-hint">Toca para continuar</div>
+    `;
+  }
+
+  renderBannerCard(key, opts = {}) {
+    const def = ITEM_DEFS[key] || { name: key, icon: "❓", rarity: 2, size: 1 };
+    const rarity = def.rarity || 2;
+    const stars = "★".repeat(rarity);
+    const badge = opts.badge || (rarity >= 5 ? "5★" : (rarity === 4 ? "4★" : ""));
+    const large = opts.large ? " large" : "";
+    const b1 = def.cardBg1 || (rarity >= 5 ? "#3b0a0a" : "#0f172a");
+    const b2 = def.cardBg2 || (rarity >= 5 ? "#0b1222" : "#020617");
+    const glow = def.cardAccent || (rarity >= 5 ? "#f59e0b" : (rarity === 4 ? "#a855f7" : "#38bdf8"));
+    const sigil = def.cardSigil || def.icon || "❖";
+    const size = def.size ? `${def.size}x${def.size}` : "";
+
+    return `
+      <div class="banner-card${large}" style="--b1:${b1};--b2:${b2};--glow:${glow};">
+        ${badge ? `<div class="banner-badge">${badge}</div>` : ""}
+        <div class="banner-sigil">${sigil}</div>
+        <div class="banner-title">${def.name || key}</div>
+        <div class="banner-meta">${size}</div>
+        <div class="banner-stars">${stars}</div>
+      </div>
     `;
   }
 
@@ -1087,7 +1532,7 @@ class EconomySystem {
       const rarity = r.rarity || def.rarity || 2;
       const stars = "★".repeat(rarity);
       return `
-        <div class="result-item rarity-${rarity}">
+        <div class="result-item rarity-${rarity}" style="--i:${idx}">
           <div class="result-icon">${def.icon || "❓"}</div>
           <div>
             <div class="result-name">#${idx + 1} · ${def.name || r.itemKey}</div>
@@ -1139,6 +1584,9 @@ class EconomySystem {
     let idx = 0;
     let timer = null;
     let revealTimer = null;
+    let preludeTimer = null;
+    let advanceTimer = null;
+    let awaitingClick = false;
 
     const getAnimMs = (rarity) => {
       if (rarity >= 5) return 2600;
@@ -1175,6 +1623,15 @@ class EconomySystem {
         clearTimeout(revealTimer);
         revealTimer = null;
       }
+      if (preludeTimer) {
+        clearTimeout(preludeTimer);
+        preludeTimer = null;
+      }
+      if (advanceTimer) {
+        clearTimeout(advanceTimer);
+        advanceTimer = null;
+      }
+      awaitingClick = false;
     };
 
     const showResults = () => {
@@ -1194,6 +1651,52 @@ class EconomySystem {
       this.isWishAnimating = false;
     };
 
+    const renderPreludeHTML = () => {
+      const isSingle = results.length <= 1;
+      const topRarity = results.reduce((m, r) => Math.max(m, (r.rarity || ITEM_DEFS[r.itemKey]?.rarity || 2)), 1);
+      const streakList = isSingle
+        ? [results[0]]
+        : results;
+
+      const streaks = streakList.map((res, i) => {
+        const rarity = res.rarity || (ITEM_DEFS[res.itemKey]?.rarity || 2);
+        const cls = (rarity >= 5) ? "rarity-5" : (rarity >= 4 ? "rarity-4" : (rarity >= 3 ? "rarity-3" : ""));
+        const y = isSingle ? 50 : (15 + (70 * (i / (streakList.length - 1))));
+        const d = (i * 0.08).toFixed(2);
+        return `<span class="prelude-streak ${cls}" style="--d:${d}s; --y:${y.toFixed(1)}%;"></span>`;
+      }).join("");
+
+      const has5 = topRarity >= 5;
+      const has4 = topRarity >= 4;
+      const badge = has5
+        ? `<div class="prelude-badge gold">Destello Dorado</div>`
+        : (has4 ? `<div class="prelude-badge purple">Destello Morado</div>` : "");
+      const auraClass = has5 ? "rarity-5" : (has4 ? "rarity-4" : (topRarity >= 3 ? "rarity-3" : ""));
+
+      return `
+        <div class="gacha-prelude ${isSingle ? "single" : ""} ${has5 ? "has-5" : (has4 ? "has-4" : "")}">
+          <div class="prelude-sky"></div>
+          <div class="prelude-aura ${auraClass}"></div>
+          <div class="prelude-streaks">${streaks}</div>
+          ${badge}
+        </div>
+      `;
+    };
+
+    const playPrelude = () => {
+      if (!stage) return;
+      stage.style.display = "flex";
+      stage.classList.add("prelude");
+      stage.classList.remove("await");
+      stage.classList.remove("reveal");
+      stage.innerHTML = renderPreludeHTML();
+      preludeTimer = setTimeout(() => {
+        if (!stage) return;
+        stage.classList.remove("prelude");
+        playNext();
+      }, 2200);
+    };
+
     const playNext = () => {
       if (!stage) return;
       if (idx >= results.length) {
@@ -1204,20 +1707,39 @@ class EconomySystem {
       const rarity = res.rarity || (ITEM_DEFS[res.itemKey]?.rarity || 2);
       applyStageTiming(rarity);
       stage.style.display = "flex";
+      stage.classList.remove("await");
       stage.classList.remove("reveal");
       stage.innerHTML = this.renderWishStageHTML(res);
       const animMs = getAnimMs(rarity);
       const revealAt = Math.max(900, animMs - 650);
       revealTimer = setTimeout(() => {
         stage.classList.add("reveal");
+        this.playStarSound(rarity);
       }, revealAt);
-      timer = setTimeout(playNext, animMs);
+      advanceTimer = setTimeout(() => {
+        awaitingClick = true;
+        stage.classList.add("await");
+      }, animMs);
     };
 
-    if (skipBtn) skipBtn.onclick = showResults;
+    if (skipBtn) skipBtn.onclick = () => {
+      this.ensureAudio();
+      showResults();
+    };
     if (closeBtn) closeBtn.onclick = close;
 
-    playNext();
+    overlay.addEventListener("click", (e) => {
+      this.ensureAudio();
+      if (!awaitingClick) return;
+      if (e.target?.closest(".gacha-anim-btn")) return;
+      if (stage) {
+        awaitingClick = false;
+        stage.classList.remove("await");
+        playNext();
+      }
+    });
+
+    playPrelude();
   }
 
   // =========================
@@ -1256,6 +1778,99 @@ class EconomySystem {
         opacity: 0;
         transition: transform .18s ease, opacity .18s ease;
       ">
+        <style>
+          #gacha-modal .banner-block {
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 14px;
+            padding: 12px;
+            background: linear-gradient(180deg, rgba(15,23,42,.85), rgba(2,6,23,.9));
+            display: grid;
+            gap: 10px;
+          }
+          #gacha-modal .banner-head {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:10px;
+          }
+          #gacha-modal .banner-name {
+            font-weight:700;
+            letter-spacing:.3px;
+          }
+          #gacha-modal .banner-hero {
+            border-radius: 12px;
+            padding: 10px;
+            background:
+              radial-gradient(circle at 20% 20%, rgba(255,255,255,.08), transparent 45%),
+              linear-gradient(135deg, rgba(30,41,59,.9), rgba(2,6,23,.9));
+            border: 1px solid rgba(255,255,255,.06);
+          }
+          #gacha-modal .banner-featured {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+          }
+          #gacha-modal .banner-featured.solo {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          #gacha-modal .banner-card {
+            position: relative;
+            border-radius: 12px;
+            padding: 10px;
+            min-height: 110px;
+            background: linear-gradient(135deg, var(--b1), var(--b2));
+            border: 1px solid color-mix(in srgb, var(--glow) 60%, rgba(255,255,255,.15));
+            box-shadow: 0 8px 20px color-mix(in srgb, var(--glow) 40%, rgba(0,0,0,.5));
+            overflow: hidden;
+          }
+          #gacha-modal .banner-card::after {
+            content: "";
+            position: absolute;
+            inset: 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.15);
+            opacity: .6;
+            pointer-events: none;
+          }
+          #gacha-modal .banner-card.large {
+            min-height: 140px;
+          }
+          #gacha-modal .banner-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(15,23,42,.7);
+            color: var(--glow);
+            border: 1px solid color-mix(in srgb, var(--glow) 60%, rgba(255,255,255,.2));
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+          }
+          #gacha-modal .banner-sigil {
+            font-size: 26px;
+            line-height: 1;
+          }
+          #gacha-modal .banner-title {
+            font-weight: 700;
+            margin-top: 6px;
+          }
+          #gacha-modal .banner-meta {
+            font-size: 12px;
+            opacity: .8;
+          }
+          #gacha-modal .banner-stars {
+            margin-top: 6px;
+            color: var(--glow);
+            text-shadow: 0 0 12px color-mix(in srgb, var(--glow) 70%, transparent);
+            letter-spacing: 1px;
+          }
+          @media (max-width: 900px) and (orientation: landscape) {
+            #gacha-modal .banner-featured { grid-template-columns: 1fr; }
+            #gacha-modal .banner-card { min-height: 90px; }
+            #gacha-modal .banner-card.large { min-height: 120px; }
+          }
+        </style>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <h2 style="margin:0;font-size:18px;">🎰 Gachapon</h2>
           <button id="gachaClose" style="
@@ -1268,17 +1883,25 @@ class EconomySystem {
           <!-- Columna izquierda: banners -->
           <div style="display:grid; gap:12px;">
             <!-- Permanente -->
-            <div style="border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <b>🌟 Banner Permanente</b>
+            <div class="banner-block">
+              <div class="banner-head">
+                <div class="banner-name">🌟 Banner Permanente</div>
                 <span>Deseos: <b id="permCount">${this.wishesPermanent}</b></span>
               </div>
 
-              <small style="opacity:.8; display:block; margin-top:10px;">
-                Items permanentes: Azul 9x9, Rojo 1x1 y Amarillo 4x4.
+              <div class="banner-hero">
+                <div class="banner-featured">
+                  ${this.renderBannerCard("perm_green_9")}
+                  ${this.renderBannerCard("perm_red_9")}
+                  ${this.renderBannerCard("perm_blue_9")}
+                </div>
+              </div>
+
+              <small style="opacity:.8; display:block;">
+                4★ asegurado cada 10 • 5★: 0.6%
               </small>
 
-              <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;">
                 <button id="permWish1" style="
                   background:#22c55e;color:#022c22;border:none;
                   padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
@@ -1288,23 +1911,26 @@ class EconomySystem {
                   padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
                 ">Deseo x10</button>
               </div>
-              <small style="opacity:.75; display:block; margin-top:8px;">
-                Pity: 4★ garantizado cada 10 (8% base) • 5★ 2% y garantizado cada 50 • Doble 5★: 0.02%.
-              </small>
             </div>
 
             <!-- Limitado -->
-            <div style="border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <b>⏳ Banner Limitado</b>
+            <div class="banner-block">
+              <div class="banner-head">
+                <div class="banner-name">⏳ Banner Limitado</div>
                 <span>Deseos: <b id="limCount">${this.wishesLimited}</b></span>
               </div>
 
-              <div style="margin-top:10px; opacity:.85; font-size:13px;">
-                4★: (Azul/Rojo/Amarillo 2x2) • 5★: (Dorado 2x2) • 50/50 vs permanente.
+              <div class="banner-hero">
+                <div class="banner-featured solo">
+                  ${this.renderBannerCard("lim_gold_2", { badge: "Promocional", large: true })}
+                </div>
               </div>
 
-              <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <div style="opacity:.85; font-size:13px;">
+                4★ asegurado cada 10 • 5★: 0.6%
+              </div>
+
+              <div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;">
                 <button id="limWish1" style="
                   background:#f59e0b;color:#1f1400;border:none;
                   padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
@@ -1314,9 +1940,6 @@ class EconomySystem {
                   padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;
                 ">Deseo x10</button>
               </div>
-              <small style="opacity:.75; display:block; margin-top:8px;">
-                En 5★ limitado: 50/50 entre dorado y permanente. Si pierdes, el siguiente 5★ es del banner.
-              </small>
             </div>
           </div>
 

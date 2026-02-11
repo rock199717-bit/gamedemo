@@ -105,6 +105,21 @@
 }
 .inv-btn:hover{ filter: brightness(1.05); }
 
+.admin-btn{
+  position: fixed;
+  right: 16px;
+  bottom: 64px;
+  z-index: 999999;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #111827;
+  color: #e5e7eb;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-btn:hover{ filter: brightness(1.05); }
+
 .inv-modal{
   position: fixed;
   inset: 0;
