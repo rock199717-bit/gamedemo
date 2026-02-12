@@ -16,7 +16,7 @@ const BUILDING_TYPES = {
   // [OK] verdes basicos (lo que ya tenias "de prueba")
   green_1: {
     key: "green_1",
-    label: "Verde 1x1",
+    label: "Casa Comun",
     size: 1,
     fill: 0x22c55e,
     border: 0x22c55e,
@@ -312,6 +312,12 @@ function screenToIsoTile(mx, my) {
 class MainScene extends Phaser.Scene {
   preload() {
     this.load.image("ui_gachapon_btn", "img/gachaponbutton.png");
+    this.load.image("ui_moneda_icon", "img/moneda.png");
+    this.load.image("ui_exp_icon", "img/experiencia.png");
+    this.load.image("green_house_1x1_normal", "img/green_casa1x1_normal.png");
+    this.load.image("green_house_1x1_giro1", "img/green_casa1x1_giro1.png");
+    this.load.image("green_house_1x1_giro2", "img/green_casa1x1_giro2.png");
+    this.load.image("green_house_1x1_giro3", "img/green_casa1x1_giro3.png");
   }
 
   create() {
@@ -344,11 +350,21 @@ class MainScene extends Phaser.Scene {
     this.gridGfx = this.add.graphics();
     this.ghost = this.add.graphics();
     this.moveGhost = this.add.graphics();
+    this.ghostSprite = this.add.image(0, 0, "green_house_1x1_normal")
+      .setOrigin(0.5, 0.9)
+      .setVisible(false)
+      .setAlpha(0.55)
+      .setDepth(6);
+    this.moveGhostSprite = this.add.image(0, 0, "green_house_1x1_normal")
+      .setOrigin(0.5, 0.9)
+      .setVisible(false)
+      .setAlpha(0.55)
+      .setDepth(6);
     this.bgGridGfx.setDepth(-5);
     this.gridGfx.setDepth(-4);
 
     // por defecto, UI cam NO debe renderizar el mundo
-    this.uiCam.ignore([this.bgGridGfx, this.gridGfx, this.ghost, this.moveGhost]);
+    this.uiCam.ignore([this.bgGridGfx, this.gridGfx, this.ghost, this.moveGhost, this.ghostSprite, this.moveGhostSprite]);
 
     // ===== Estado input =====
     this.isDragging = false;
@@ -466,11 +482,23 @@ class MainScene extends Phaser.Scene {
       }
 
       // ghost build
-      if (mode !== "build" || this.pending || this.selectedBuildingId) return;
+      if (mode !== "build" || this.selectedBuildingId) {
+        this.ghostSprite?.setVisible(false);
+        return;
+      }
+
+      if (this.pending) {
+        // Mantener visible el ghost mientras estan los botones de confirmar.
+        this.renderPendingGhost();
+        return;
+      }
 
       const tile = screenToIsoTile(pointer.worldX, pointer.worldY);
       this.ghost.clear();
-      if (!tile) return;
+      if (!tile) {
+        this.ghostSprite?.setVisible(false);
+        return;
+      }
 
       const preview = this.getBuildPreview();
       const size = preview.size;
@@ -486,6 +514,12 @@ class MainScene extends Phaser.Scene {
         }
       }
       this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.25, ok ? okBorder : badColor);
+
+      if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
+        this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
+      } else {
+        this.ghostSprite?.setVisible(false);
+      }
     });
 
     this.input.on("pointerup", (pointer) => {
@@ -579,6 +613,7 @@ class MainScene extends Phaser.Scene {
       // si estas arriba del UI, oculta el ghost
       if (p.y <= 140) {
         this.moveGhost.clear();
+        this.moveGhostSprite?.setVisible(false);
       } else {
         const tile = screenToIsoTile(p.worldX, p.worldY);
         this.renderMoveGhost(tile);
@@ -723,6 +758,70 @@ class MainScene extends Phaser.Scene {
     return { typeKey, def, size };
   }
 
+  isSpriteBuilding(typeKey) {
+    return typeKey === "green_1";
+  }
+
+  getSpriteTextureForBuilding(typeKey, rotationStep = 0) {
+    if (!this.isSpriteBuilding(typeKey)) return null;
+    const step = ((rotationStep % 4) + 4) % 4;
+    if (step === 0) return "green_house_1x1_normal";
+    return `green_house_1x1_giro${step}`;
+  }
+
+  getSpriteImagePathForBuilding(typeKey, rotationStep = 0) {
+    if (!this.isSpriteBuilding(typeKey)) return null;
+    const step = ((rotationStep % 4) + 4) % 4;
+    if (step === 0) return "img/green_casa1x1_normal.png";
+    return `img/green_casa1x1_giro${step}.png`;
+  }
+
+  getSpriteDrawSize(textureKey) {
+    const maxW = TILE_W * 1.03;
+    const maxH = TILE_H * 1.60;
+    const tex = this.textures?.get?.(textureKey);
+    const source = tex?.getSourceImage?.();
+    if (!source || !source.width || !source.height) {
+      return { w: maxW, h: maxH };
+    }
+    const scale = Math.min(maxW / source.width, maxH / source.height);
+    return {
+      w: source.width * scale,
+      h: source.height * scale
+    };
+  }
+
+  placeSpriteAtTile(sprite, typeKey, rotationStep, r, c, alpha = 1) {
+    if (!sprite) return;
+    const textureKey = this.getSpriteTextureForBuilding(typeKey, rotationStep);
+    if (!textureKey) {
+      sprite.setVisible(false);
+      return;
+    }
+    if (sprite.texture?.key !== textureKey) {
+      sprite.setTexture(textureKey);
+    }
+    const size = this.getSpriteDrawSize(textureKey);
+    const anchor = isoToScreen(r, c);
+    sprite.setDisplaySize(size.w, size.h);
+    const px = Math.round(anchor.x);
+    const py = Math.round(anchor.y + (TILE_H * 0.31));
+    sprite.setPosition(px, py);
+    sprite.setAlpha(alpha);
+    sprite.setDepth(30 + (anchor.y * 0.01));
+    sprite.setVisible(true);
+  }
+
+  updateBuildingSpriteVisual(b, alpha = 1) {
+    if (!b || !b.sprite) return;
+    const topLeft = b.cells.reduce((best, cur) => {
+      if (!best) return cur;
+      return (cur.r + cur.c) < (best.r + best.c) ? cur : best;
+    }, null);
+    if (!topLeft) return;
+    this.placeSpriteAtTile(b.sprite, b.typeKey, b.rotationStep || 0, topLeft.r, topLeft.c, alpha);
+  }
+
   setBuildMode() {
     if (document.getElementById("evo-modal") || document.getElementById("building-modal")) {
       this.setCursorMode();
@@ -739,6 +838,8 @@ class MainScene extends Phaser.Scene {
     this.modeText.setText(this.modeLabel());
     this.clearPending();
     this.ghost.clear();
+    this.ghostSprite?.setVisible(false);
+    this.moveGhostSprite?.setVisible(false);
 
     this.cancelBuildBtn.setVisible(false);
     this.cancelBuildBorder.setVisible(false);
@@ -883,11 +984,13 @@ class MainScene extends Phaser.Scene {
     this.pending = null;
     this.confirmOk.setVisible(false);
     this.confirmX.setVisible(false);
+    this.ghostSprite?.setVisible(false);
   }
 
   renderPendingGhost() {
     if (!this.pending) return;
     const { tile, size, ok, color, border } = this.pending;
+    const preview = this.getBuildPreview();
 
     this.ghost.clear();
     const okColor = color ?? 0x22c55e;
@@ -901,6 +1004,11 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.35, ok ? okBorder : badColor);
+    if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
+      this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
+    } else {
+      this.ghostSprite?.setVisible(false);
+    }
   }
 
   // ===== Action buttons =====
@@ -1041,13 +1149,38 @@ class MainScene extends Phaser.Scene {
     return html;
   }
 
+  getEvolutionStats(typeKey, stage, level) {
+    const clampedLevel = Math.max(0, Math.min(5, level || 0));
+    const baseRarity = this.getRarityForKey(typeKey);
+
+    if (baseRarity >= 1 && baseRarity <= 3) {
+      const t = clampedLevel / 5;
+      const prodReductionPct = Math.round(20 * t);
+      const rewardBonusPct = Math.round(30 * t);
+      return {
+        buildMult: 1,
+        prodMult: 1 - (0.20 * t),
+        rewardMult: 1 + (0.30 * t),
+        bonusLabel: `Prod -${prodReductionPct}% | Oro/EXP +${rewardBonusPct}%`
+      };
+    }
+
+    const total = (stage >= 6) ? (5 + clampedLevel) : clampedLevel;
+    const speedMult = Math.max(0.5, 1 - (0.01 * total));
+    const rewardMult = 1 + (0.01 * total);
+    return {
+      buildMult: speedMult,
+      prodMult: speedMult,
+      rewardMult,
+      bonusLabel: `+${total}%`
+    };
+  }
+
   applyEvolution(b, now = Date.now()) {
     if (!b) return;
     const level = Math.max(0, Math.min(5, b.evoLevel || 0));
     const stage = (typeof b.evoStage === "number") ? b.evoStage : 5;
-    const total = (stage >= 6) ? (5 + level) : level;
-    const mult = 1 + (0.01 * total);
-    const speed = Math.max(0.5, 1 - (0.01 * total));
+    const evoStats = this.getEvolutionStats(b.typeKey, stage, level);
 
     const prevBuild = b.buildSeconds ?? b.baseBuildSeconds ?? 0;
     const prevProd = b.prodSeconds ?? b.baseProdSeconds ?? 1;
@@ -1056,11 +1189,11 @@ class MainScene extends Phaser.Scene {
     const baseProd = b.baseProdSeconds ?? prevProd;
     const baseReward = b.baseReward || b.reward || { exp: 0, gold: 0 };
 
-    b.buildSeconds = Math.max(0, Math.round(baseBuild * speed));
-    b.prodSeconds = Math.max(1, Math.round(baseProd * speed));
+    b.buildSeconds = Math.max(0, Math.round(baseBuild * evoStats.buildMult));
+    b.prodSeconds = Math.max(1, Math.round(baseProd * evoStats.prodMult));
     b.reward = {
-      exp: Math.max(0, Math.round(baseReward.exp * mult)),
-      gold: Math.max(0, Math.round(baseReward.gold * mult))
+      exp: Math.max(0, Math.round(baseReward.exp * evoStats.rewardMult)),
+      gold: Math.max(0, Math.round(baseReward.gold * evoStats.rewardMult))
     };
 
     b.prodCycle = b.prodSeconds * 1000;
@@ -1288,7 +1421,6 @@ class MainScene extends Phaser.Scene {
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     const targetRarity = this.getRarityForKey(b.typeKey);
-    if (targetRarity < 5) return;
     const targetSize = def.size;
     const targetColor = this.getColorForKey(b.typeKey);
     const fillHex = this.colorToHex(def.fill);
@@ -1296,7 +1428,9 @@ class MainScene extends Phaser.Scene {
     const itemIcon = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[b.typeKey]?.icon)
       ? ITEM_DEFS[b.typeKey].icon
       : "\u2726";
-    const previewSvg = `
+    const previewContent = this.isSpriteBuilding(b.typeKey)
+      ? `<img src="${this.getSpriteImagePathForBuilding(b.typeKey, b.rotationStep || 0)}" alt="${def.label || b.typeKey}" style="width:56px;height:auto;display:block;filter: drop-shadow(0 3px 6px rgba(0,0,0,.35));">`
+      : `
       <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
         <polygon points="60,8 112,40 60,72 8,40" fill="${fillHex}" stroke="${borderHex}" stroke-width="3"/>
       </svg>
@@ -1328,10 +1462,13 @@ class MainScene extends Phaser.Scene {
       ? candidates.map((key) => {
           const item = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[key]) ? ITEM_DEFS[key] : { name: key, size: targetSize, rarity: targetRarity, icon: "\u2726" };
           const count = this.economy.inventory[key] || 0;
+          const itemIconHtml = this.isSpriteBuilding(key)
+            ? `<img src="${this.getSpriteImagePathForBuilding(key, 0)}" alt="${item.name || key}" style="width:20px;height:auto;display:block;">`
+            : (item.icon || "\u2726");
           return `
             <button class="evo-item" data-key="${key}">
               <span class="evo-item-left">
-                <span class="evo-item-ico">${item.icon || "\u2726"}</span>
+                <span class="evo-item-ico">${itemIconHtml}</span>
                 <span>
                   <div class="evo-item-name">${item.name || key}</div>
                   <div class="evo-item-meta">${item.size}x${item.size}  |  ${item.rarity}\u2605</div>
@@ -1348,12 +1485,18 @@ class MainScene extends Phaser.Scene {
       ? b.evoStage
       : (targetRarity === 5 ? 5 : 0);
     const stageLabel = (evoStage >= 5 ? evoStage : targetRarity);
+    const evoStatsLabel = this.getEvolutionStats(b.typeKey, evoStage, evoLevel).bonusLabel;
     const displayRarity = (targetRarity === 5 && evoStage >= 6) ? 6 : targetRarity;
     const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const maxColorFrameClass = (displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5)
+      ? ` maxed-${displayRarity}`
+      : "";
     const frameClass = displayRarity === 6
       ? `frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
-      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
-    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? " chrome" : "";
+      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}${maxColorFrameClass}`;
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5)
+      ? " chrome"
+      : ((displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5) ? ` chrome-${displayRarity}` : "");
     const slotsHtml = Array.from({ length: 5 }, (_, i) => {
       const fixed = i < evoLevel;
       return `
@@ -1405,7 +1548,15 @@ class MainScene extends Phaser.Scene {
           }
           #evo-modal .evo-item:disabled { opacity:.5; cursor:not-allowed; }
           #evo-modal .evo-item-left { display:flex; align-items:center; gap:10px; }
-          #evo-modal .evo-item-ico { font-size: 20px; }
+          #evo-modal .evo-item-ico {
+            font-size: 20px;
+            width: 22px;
+            min-width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
           #evo-modal .evo-item-name { font-weight: 700; }
           #evo-modal .evo-item-meta { opacity:.75; font-size:12px; }
           #evo-modal .evo-main {
@@ -1427,6 +1578,10 @@ class MainScene extends Phaser.Scene {
             align-items: center;
             justify-content: center;
             box-shadow: 0 6px 14px rgba(0,0,0,.35);
+            display: none !important;
+            opacity: 0;
+            transform: scale(0);
+            pointer-events: none;
           }
           #evo-modal .evo-main-card {
             position: relative;
@@ -1437,7 +1592,22 @@ class MainScene extends Phaser.Scene {
           #evo-modal .evo-main-card.evo-animate {
             animation: evoPulse .5s ease;
           }
-          #evo-modal .preview-frame { width: 100%; height: 140px; }
+          #evo-modal .preview-frame {
+            width: 100%;
+            height: 140px;
+            --bevel: 11px;
+            border-radius: 0;
+            clip-path: polygon(
+              var(--bevel) 0,
+              calc(100% - var(--bevel)) 0,
+              100% var(--bevel),
+              100% calc(100% - var(--bevel)),
+              calc(100% - var(--bevel)) 100%,
+              var(--bevel) 100%,
+              0 calc(100% - var(--bevel)),
+              0 var(--bevel)
+            );
+          }
           #evo-modal .preview-inner { height: 100%; }
           #evo-modal .evo-title { font-weight: 700; }
           #evo-modal .evo-stars { letter-spacing: 1px; color: #fbbf24; }
@@ -1456,6 +1626,14 @@ class MainScene extends Phaser.Scene {
             transform: rotate(-45deg) scale(.9);
             font-size: 12px;
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          #evo-modal .evo-slot-ico img {
+            width: 12px;
+            height: auto;
+            display: block;
           }
           #evo-modal .evo-slot.filled {
             background: #fbbf24;
@@ -1473,15 +1651,20 @@ class MainScene extends Phaser.Scene {
             width: 100%;
             height: 140px;
             padding: 6px;
-            border-radius: 14px;
+            border-radius: 0;
             display:flex; align-items:center; justify-content:center;
             overflow: hidden;
+            clip-path: inherit;
           }
           #evo-modal .frame-1 { background: #6b7280; }
-          #evo-modal .frame-2 { background: #065f46; }
-          #evo-modal .frame-3 { background: #78350f; }
-          #evo-modal .frame-4 { background: #94a3b8; }
+          #evo-modal .frame-2 { background: linear-gradient(135deg,#22c55e 0%, #16a34a 45%, #86efac 62%, #065f46 100%); }
+          #evo-modal .frame-3 { background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 62%, #94a3b8 100%); }
+          #evo-modal .frame-4 { background: linear-gradient(135deg,#c4b5fd 0%, #8b5cf6 45%, #a78bfa 62%, #5b21b6 100%); }
           #evo-modal .frame-5 { background: #b45309; }
+          #evo-modal .frame-1.maxed-1 { box-shadow: 0 0 14px rgba(226,232,240,.5); }
+          #evo-modal .frame-2.maxed-2 { box-shadow: 0 0 16px rgba(34,197,94,.62), 0 0 30px rgba(16,185,129,.32); }
+          #evo-modal .frame-3.maxed-3 { box-shadow: 0 0 16px rgba(226,232,240,.6), 0 0 30px rgba(148,163,184,.38); }
+          #evo-modal .frame-4.maxed-4 { box-shadow: 0 0 16px rgba(168,85,247,.62), 0 0 30px rgba(139,92,246,.38); }
           #evo-modal .evo-on {
             box-shadow:
               inset 0 1px 2px rgba(255,255,255,.35),
@@ -1491,11 +1674,12 @@ class MainScene extends Phaser.Scene {
           #evo-modal .evo-on::before {
             content:"";
             position:absolute;
-            inset:2px;
-            border-radius:12px;
+            inset:1px;
+            border-radius:0;
             border:1px solid rgba(255,255,255,.28);
             pointer-events:none;
             mix-blend-mode: screen;
+            clip-path: inherit;
           }
           #evo-modal .evo-on::after {
             content:"";
@@ -1508,18 +1692,19 @@ class MainScene extends Phaser.Scene {
             opacity:.55;
             transform: translateX(-20%) rotate(8deg);
             pointer-events:none;
+            clip-path: inherit;
           }
-          #evo-modal .frame-1.evo-on {
-            background: linear-gradient(135deg,#e5e7eb 0%, #9ca3af 45%, #f8fafc 60%, #6b7280 100%);
-          }
+          #evo-modal .frame-1.evo-on { background: #6b7280; box-shadow: inset 0 1px 2px rgba(0,0,0,.45); }
+          #evo-modal .frame-1.evo-on::before,
+          #evo-modal .frame-1.evo-on::after { content: none; }
           #evo-modal .frame-2.evo-on {
             background: linear-gradient(135deg,#34d399 0%, #16a34a 45%, #86efac 60%, #065f46 100%);
           }
           #evo-modal .frame-3.evo-on {
-            background: linear-gradient(135deg,#f59e0b 0%, #b45309 45%, #fcd34d 60%, #78350f 100%);
+            background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
           }
           #evo-modal .frame-4.evo-on {
-            background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
+            background: linear-gradient(135deg,#c4b5fd 0%, #8b5cf6 45%, #a78bfa 60%, #5b21b6 100%);
           }
           #evo-modal .frame-5.evo-on {
             background: linear-gradient(135deg,#fde68a 0%, #f59e0b 45%, #fbbf24 60%, #b45309 100%);
@@ -1532,10 +1717,21 @@ class MainScene extends Phaser.Scene {
             position: relative;
             width: 100%;
             height: 100%;
-            border-radius: 10px;
+            --bevel-in: 8px;
+            border-radius: 0;
             background: rgba(2,6,23,.65);
             display:flex; align-items:center; justify-content:center;
             overflow:hidden;
+            clip-path: polygon(
+              var(--bevel-in) 0,
+              calc(100% - var(--bevel-in)) 0,
+              100% var(--bevel-in),
+              100% calc(100% - var(--bevel-in)),
+              calc(100% - var(--bevel-in)) 100%,
+              var(--bevel-in) 100%,
+              0 calc(100% - var(--bevel-in)),
+              0 var(--bevel-in)
+            );
           }
           #evo-modal .preview-inner.chrome::after {
             content:"";
@@ -1545,6 +1741,31 @@ class MainScene extends Phaser.Scene {
             animation: chromeSheen 2.2s linear infinite;
             mix-blend-mode: screen;
             opacity:.9;
+            clip-path: inherit;
+          }
+          #evo-modal .preview-inner.chrome-1::after,
+          #evo-modal .preview-inner.chrome-2::after,
+          #evo-modal .preview-inner.chrome-3::after,
+          #evo-modal .preview-inner.chrome-4::after {
+            content:"";
+            position:absolute;
+            inset:-60%;
+            animation: chromeSheen 2s linear infinite;
+            mix-blend-mode: screen;
+            opacity:.95;
+            clip-path: inherit;
+          }
+          #evo-modal .preview-inner.chrome-1::after {
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(226,232,240,.78) 35%, rgba(148,163,184,.88) 50%, rgba(255,255,255,0) 65%);
+          }
+          #evo-modal .preview-inner.chrome-2::after {
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(134,239,172,.82) 35%, rgba(34,197,94,.86) 50%, rgba(255,255,255,0) 65%);
+          }
+          #evo-modal .preview-inner.chrome-3::after {
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(248,250,252,.85) 35%, rgba(203,213,225,.88) 50%, rgba(255,255,255,0) 65%);
+          }
+          #evo-modal .preview-inner.chrome-4::after {
+            background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(196,181,253,.86) 35%, rgba(168,85,247,.9) 50%, rgba(255,255,255,0) 65%);
           }
           #evo-modal .evo-empty { opacity:.75; padding: 10px; }
           #evo-modal .evo-trans-fx {
@@ -1666,11 +1887,20 @@ class MainScene extends Phaser.Scene {
           }
           #evo-modal .evo-spark {
             position: absolute;
-            width: 8px;
-            height: 8px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,0) 70%);
-            box-shadow: 0 0 10px rgba(251,191,36,.8), 0 0 18px rgba(245,158,11,.6);
+            background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(253,224,71,.95) 28%, rgba(251,191,36,.78) 52%, rgba(245,158,11,0) 78%);
+            box-shadow: 0 0 16px rgba(253,224,71,.95), 0 0 30px rgba(245,158,11,.75), 0 0 52px rgba(245,158,11,.45);
+          }
+          #evo-modal .evo-impact {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(253,224,71,.95);
+            box-shadow: 0 0 14px rgba(253,224,71,.9), 0 0 26px rgba(245,158,11,.7);
+            pointer-events: none;
           }
           #evo-modal .evo-trans-flash {
             position: absolute;
@@ -1758,13 +1988,13 @@ class MainScene extends Phaser.Scene {
             <div id="evoMainCard" class="evo-main-card">
               <div id="evoFrame" class="${frameClass}">
                 <div id="evoInner" class="preview-inner${chromeClass}">
-                  ${previewSvg}
+                  ${previewContent}
                 </div>
               </div>
             </div>
             <div class="evo-title">${def.label || b.typeKey}</div>
           <div id="evoStars" class="evo-stars">${evoStarsHtml}</div>
-            <small id="evoLevelText" style="opacity:.75;">Evolucion ${stageLabel}\u2605: ${evoLevel}/5 (+${(evoStage >= 6) ? (5 + evoLevel) : evoLevel}%)</small>
+            <small id="evoLevelText" style="opacity:.75;">Evolucion ${stageLabel}\u2605: ${evoLevel}/5 (${evoStatsLabel})</small>
           </div>
         </div>
         <div id="evoSlots" class="evo-slots">
@@ -1821,21 +2051,41 @@ class MainScene extends Phaser.Scene {
         const sy = r.top + r.height / 2 - winRect.top;
         const spark = document.createElement("div");
         spark.className = "evo-spark";
-        spark.style.left = `${sx - 4}px`;
-        spark.style.top = `${sy - 4}px`;
+        spark.style.left = `${sx - 7}px`;
+        spark.style.top = `${sy - 7}px`;
         evoSparkLayer.appendChild(spark);
         const dx = tx - sx;
         const dy = ty - sy;
-        const delay = i * 60;
+        const delay = i * 120;
         const anim = spark.animate([
-          { transform: "translate(0,0) scale(1)", opacity: 1 },
-          { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0 }
+          { transform: "translate(0,0) scale(0.45)", opacity: 0 },
+          { transform: "translate(0,0) scale(1.25)", opacity: 1, offset: 0.18 },
+          { transform: `translate(${dx * 0.82}px, ${dy * 0.82}px) scale(1.06)`, opacity: 1, offset: 0.74 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0.05 }
         ], {
-          duration: 450,
+          duration: 980,
           delay,
-          easing: "cubic-bezier(.2,.8,.2,1)"
+          easing: "cubic-bezier(.16,.84,.22,1)"
         });
-        anim.onfinish = () => spark.remove();
+        anim.onfinish = () => {
+          spark.remove();
+          if (i === pendingSlots.length - 1) {
+            const impact = document.createElement("div");
+            impact.className = "evo-impact";
+            impact.style.left = `${tx - 9}px`;
+            impact.style.top = `${ty - 9}px`;
+            evoSparkLayer.appendChild(impact);
+            const hit = impact.animate([
+              { transform: "scale(0.35)", opacity: 0 },
+              { transform: "scale(1)", opacity: 1, offset: 0.28 },
+              { transform: "scale(1.95)", opacity: 0 }
+            ], {
+              duration: 520,
+              easing: "ease-out"
+            });
+            hit.onfinish = () => impact.remove();
+          }
+        };
       });
     };
 
@@ -1859,13 +2109,13 @@ class MainScene extends Phaser.Scene {
           s.dataset.pending = "";
           s.dataset.key = "";
           const ico = s.querySelector(".evo-slot-ico");
-          if (ico) ico.textContent = "";
+          if (ico) ico.innerHTML = "";
         } else if (s.dataset.pending !== "1") {
           s.classList.remove("filled");
           s.classList.remove("pending");
           s.dataset.key = "";
           const ico = s.querySelector(".evo-slot-ico");
-          if (ico) ico.textContent = "";
+          if (ico) ico.innerHTML = "";
         }
       });
     };
@@ -1873,8 +2123,8 @@ class MainScene extends Phaser.Scene {
     const refreshMeta = () => {
       const level = getLevel();
       const stage = getStage();
-      const total = (stage >= 6) ? (5 + level) : level;
-      if (evoLevelText) evoLevelText.textContent = `Evolucion ${stage >= 5 ? stage : targetRarity}\u2605: ${level}/5 (+${total}%)`;
+      const stats = this.getEvolutionStats(b.typeKey, stage, level);
+      if (evoLevelText) evoLevelText.textContent = `Evolucion ${stage >= 5 ? stage : targetRarity}\u2605: ${level}/5 (${stats.bonusLabel})`;
 
       const display = (targetRarity === 5 && stage >= 6) ? 6 : targetRarity;
       const evoActive = (level > 0) || (stage >= 6);
@@ -1885,11 +2135,17 @@ class MainScene extends Phaser.Scene {
           evoStars.textContent = "\u2605".repeat(display);
         }
       }
+      const maxColorFrame = (display >= 1 && display <= 4 && level >= 5)
+        ? ` maxed-${display}`
+        : "";
       const frameCls = display === 6
         ? `frame-6${(stage >= 6 && level >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
-        : `frame-${display}${evoActive ? " evo-on" : ""}`;
+        : `frame-${display}${evoActive ? " evo-on" : ""}${maxColorFrame}`;
       if (evoFrame) evoFrame.className = frameCls;
-      if (evoInner) evoInner.className = `preview-inner${(display === 6 && stage >= 6 && level >= 5) ? " chrome" : ""}`;
+      const innerChrome = (display === 6 && stage >= 6 && level >= 5)
+        ? " chrome"
+        : ((display >= 1 && display <= 4 && level >= 5) ? ` chrome-${display}` : "");
+      if (evoInner) evoInner.className = `preview-inner${innerChrome}`;
     };
 
     const updateListCounts = () => {
@@ -1934,7 +2190,7 @@ class MainScene extends Phaser.Scene {
       }
     };
 
-    const addPending = (key, icon) => {
+    const addPending = (key, iconHtml) => {
       if (remainingSlots() <= 0) return;
       const count = this.economy.inventory[key] || 0;
       const used = pendingUsed[key] || 0;
@@ -1945,7 +2201,7 @@ class MainScene extends Phaser.Scene {
       slot.dataset.key = key;
       slot.classList.add("filled", "pending", "pop");
       const ico = slot.querySelector(".evo-slot-ico");
-      if (ico) ico.textContent = icon || "\u2726";
+      if (ico) ico.innerHTML = iconHtml || "\u2726";
       setTimeout(() => slot.classList.remove("pop"), 350);
       pendingUsed[key] = used + 1;
       updateListCounts();
@@ -1960,7 +2216,7 @@ class MainScene extends Phaser.Scene {
           s.classList.remove("pending");
           if (s.dataset.fixed !== "1") s.classList.remove("filled");
           const ico = s.querySelector(".evo-slot-ico");
-          if (ico) ico.textContent = "";
+          if (ico) ico.innerHTML = "";
         }
       });
       Object.keys(pendingUsed).forEach((k) => delete pendingUsed[k]);
@@ -1977,7 +2233,7 @@ class MainScene extends Phaser.Scene {
         slot.classList.remove("pending");
         if (slot.dataset.fixed !== "1") slot.classList.remove("filled");
         const ico = slot.querySelector(".evo-slot-ico");
-        if (ico) ico.textContent = "";
+        if (ico) ico.innerHTML = "";
         if (key) pendingUsed[key] = Math.max(0, (pendingUsed[key] || 1) - 1);
         updateListCounts();
         updateApplyState();
@@ -1988,8 +2244,8 @@ class MainScene extends Phaser.Scene {
       btn.addEventListener("click", () => {
         const key = btn.getAttribute("data-key");
         if (!key) return;
-        const icon = btn.querySelector(".evo-item-ico")?.textContent || "\u2726";
-        addPending(key, icon);
+        const iconHtml = btn.querySelector(".evo-item-ico")?.innerHTML || "\u2726";
+        addPending(key, iconHtml);
       });
     });
 
@@ -2033,10 +2289,8 @@ class MainScene extends Phaser.Scene {
         this.updateBuildingInfoModal(b, def, Date.now());
         this.openBuildingInfoModal(b.id);
 
-        if (newLevel < 5) {
-          const pendingSlots = slots.filter((s) => s.dataset.pending === "1");
-          playEvoSparks(pendingSlots);
-        }
+        const pendingSlots = slots.filter((s) => s.dataset.pending === "1");
+        playEvoSparks(pendingSlots);
 
         if (evoMainCard) {
           evoMainCard.classList.remove("evo-animate");
@@ -2112,6 +2366,10 @@ class MainScene extends Phaser.Scene {
       : (baseRarity === 5 ? 5 : 0);
     const displayRarity = (baseRarity === 5 && evoStage >= 6) ? 6 : baseRarity;
     const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const initialEvoStatsLabel = this.getEvolutionStats(b.typeKey, evoStage, evoLevel).bonusLabel;
+    const maxColorFrameClass = (displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5)
+      ? ` maxed-${displayRarity}`
+      : "";
     const stars = "\u2605".repeat(displayRarity);
     const starsHtml = (displayRarity === 6)
       ? Array.from({ length: 6 }, (_, i) => `<span class="star star-6" style="--h:${i * 60}deg">\u2605</span>`).join("")
@@ -2119,12 +2377,14 @@ class MainScene extends Phaser.Scene {
     const starClass = (displayRarity === 6) ? "stars-6" : (displayRarity === 5 ? "stars-5" : "stars-base");
     const frameClass = displayRarity === 6
       ? `frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
-      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
+      : `frame-${displayRarity}${evoActive ? " evo-on" : ""}${maxColorFrameClass}`;
     const winClass = `building-window win-${displayRarity}${evoActive ? " evo-on" : ""}${(displayRarity === 6 && evoLevel >= 5) ? " win-6max" : ""}`;
-    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? " chrome" : "";
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5)
+      ? " chrome"
+      : ((displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5) ? ` chrome-${displayRarity}` : "");
     const baseLabel = def.label || def.key;
-    const displayLabel = (b.typeKey === "green_1" && b.size !== def.size)
-      ? `Verde ${b.size}x${b.size}`
+    const displayLabel = (b.typeKey === "green_1")
+      ? "Casa Comun"
       : baseLabel;
     const buildLabel = this.formatSeconds(b.buildSeconds ?? def.buildSeconds);
     const prodLabel = this.formatSeconds(b.prodSeconds ?? def.prodSeconds);
@@ -2132,7 +2392,9 @@ class MainScene extends Phaser.Scene {
     const rewardExp = b.reward?.exp ?? def.reward?.exp ?? 0;
     const fillHex = this.colorToHex(def.fill);
     const borderHex = this.colorToHex(def.border);
-    const previewSvg = `
+    const previewContent = this.isSpriteBuilding(b.typeKey)
+      ? `<img src="${this.getSpriteImagePathForBuilding(b.typeKey, b.rotationStep || 0)}" alt="${displayLabel}" style="width:64px;height:auto;display:block;filter: drop-shadow(0 3px 6px rgba(0,0,0,.35));">`
+      : `
       <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
         <polygon points="60,8 112,40 60,72 8,40" fill="${fillHex}" stroke="${borderHex}" stroke-width="3"/>
       </svg>
@@ -2182,21 +2444,33 @@ class MainScene extends Phaser.Scene {
           width: 140px;
           height: 90px;
           padding: 6px;
-          border-radius: 14px;
+          --bevel: 10px;
+          border-radius: 0;
           background: #0f172a;
           display: flex;
           align-items: center;
           justify-content: center;
           box-shadow: inset 0 1px 2px rgba(0,0,0,.45);
           overflow: hidden;
+          clip-path: polygon(
+            var(--bevel) 0,
+            calc(100% - var(--bevel)) 0,
+            100% var(--bevel),
+            100% calc(100% - var(--bevel)),
+            calc(100% - var(--bevel)) 100%,
+            var(--bevel) 100%,
+            0 calc(100% - var(--bevel)),
+            0 var(--bevel)
+          );
         }
         #building-modal .preview-frame::before {
           content: "";
           position: absolute;
           inset: 2px;
-          border-radius: 12px;
+          border-radius: 0;
           border: 1px solid rgba(255,255,255,.08);
           pointer-events: none;
+          clip-path: inherit;
         }
         #building-modal .preview-frame.evo-on {
           box-shadow:
@@ -2219,17 +2493,36 @@ class MainScene extends Phaser.Scene {
           opacity: .55;
           transform: translateX(-20%) rotate(8deg);
           pointer-events: none;
+          clip-path: inherit;
+        }
+        #building-modal .preview-frame.frame-1.evo-on {
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.45);
+        }
+        #building-modal .preview-frame.frame-1.evo-on::before,
+        #building-modal .preview-frame.frame-1.evo-on::after {
+          content: none;
         }
         #building-modal .preview-inner {
           position: relative;
           width: 100%;
           height: 100%;
-          border-radius: 10px;
+          --bevel-in: 7px;
+          border-radius: 0;
           background: rgba(2,6,23,.65);
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
+          clip-path: polygon(
+            var(--bevel-in) 0,
+            calc(100% - var(--bevel-in)) 0,
+            100% var(--bevel-in),
+            100% calc(100% - var(--bevel-in)),
+            calc(100% - var(--bevel-in)) 100%,
+            var(--bevel-in) 100%,
+            0 calc(100% - var(--bevel-in)),
+            0 var(--bevel-in)
+          );
         }
         #building-modal .preview-stars { font-weight: 800; letter-spacing: 1px; }
         #building-modal .stars-base { color: #fbbf24; text-shadow: 0 0 6px rgba(251,191,36,.35); }
@@ -2267,28 +2560,56 @@ class MainScene extends Phaser.Scene {
           mix-blend-mode: screen;
           opacity: .9;
           pointer-events: none;
+          clip-path: inherit;
+        }
+        #building-modal .preview-inner.chrome-1::after,
+        #building-modal .preview-inner.chrome-2::after,
+        #building-modal .preview-inner.chrome-3::after,
+        #building-modal .preview-inner.chrome-4::after {
+          content: "";
+          position: absolute;
+          inset: -60%;
+          animation: chromeSheen 2s linear infinite;
+          mix-blend-mode: screen;
+          opacity: .95;
+          pointer-events: none;
+          clip-path: inherit;
+        }
+        #building-modal .preview-inner.chrome-1::after {
+          background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(226,232,240,.78) 35%, rgba(148,163,184,.88) 50%, rgba(255,255,255,0) 65%);
+        }
+        #building-modal .preview-inner.chrome-2::after {
+          background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(134,239,172,.82) 35%, rgba(34,197,94,.86) 50%, rgba(255,255,255,0) 65%);
+        }
+        #building-modal .preview-inner.chrome-3::after {
+          background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(248,250,252,.85) 35%, rgba(203,213,225,.88) 50%, rgba(255,255,255,0) 65%);
+        }
+        #building-modal .preview-inner.chrome-4::after {
+          background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(196,181,253,.86) 35%, rgba(168,85,247,.9) 50%, rgba(255,255,255,0) 65%);
         }
         #building-modal .frame-1 { background: #6b7280; }
-        #building-modal .frame-2 { background: #065f46; }
-        #building-modal .frame-3 { background: #78350f; }
-        #building-modal .frame-4 { background: #94a3b8; }
+        #building-modal .frame-2 { background: linear-gradient(135deg,#22c55e 0%, #16a34a 45%, #86efac 62%, #065f46 100%); }
+        #building-modal .frame-3 { background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 62%, #94a3b8 100%); }
+        #building-modal .frame-4 { background: linear-gradient(135deg,#c4b5fd 0%, #8b5cf6 45%, #a78bfa 62%, #5b21b6 100%); }
         #building-modal .frame-5 { background: #b45309; }
+        #building-modal .frame-1.maxed-1 { box-shadow: 0 0 14px rgba(226,232,240,.5); }
+        #building-modal .frame-2.maxed-2 { box-shadow: 0 0 16px rgba(34,197,94,.62), 0 0 30px rgba(16,185,129,.32); }
+        #building-modal .frame-3.maxed-3 { box-shadow: 0 0 16px rgba(226,232,240,.6), 0 0 30px rgba(148,163,184,.38); }
+        #building-modal .frame-4.maxed-4 { box-shadow: 0 0 16px rgba(168,85,247,.62), 0 0 30px rgba(139,92,246,.38); }
         #building-modal .frame-6 {
           background:
             conic-gradient(from 0deg,
               #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
         }
-        #building-modal .frame-1.evo-on {
-          background: linear-gradient(135deg,#e5e7eb 0%, #9ca3af 45%, #f8fafc 60%, #6b7280 100%);
-        }
+        #building-modal .frame-1.evo-on { background: #6b7280; }
         #building-modal .frame-2.evo-on {
           background: linear-gradient(135deg,#34d399 0%, #16a34a 45%, #86efac 60%, #065f46 100%);
         }
         #building-modal .frame-3.evo-on {
-          background: linear-gradient(135deg,#f59e0b 0%, #b45309 45%, #fcd34d 60%, #78350f 100%);
+          background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
         }
         #building-modal .frame-4.evo-on {
-          background: linear-gradient(135deg,#f8fafc 0%, #cbd5e1 45%, #e2e8f0 60%, #94a3b8 100%);
+          background: linear-gradient(135deg,#c4b5fd 0%, #8b5cf6 45%, #a78bfa 60%, #5b21b6 100%);
         }
         #building-modal .frame-5.evo-on {
           background: linear-gradient(135deg,#fde68a 0%, #f59e0b 45%, #fbbf24 60%, #b45309 100%);
@@ -2330,7 +2651,7 @@ class MainScene extends Phaser.Scene {
           <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <div id="previewFrame" class="preview-frame ${frameClass}">
               <div id="previewInner" class="preview-inner${chromeClass}">
-                ${previewSvg}
+                ${previewContent}
               </div>
             </div>
             <div style="display:grid; gap:6px;">
@@ -2387,7 +2708,7 @@ class MainScene extends Phaser.Scene {
         <div style="margin-top:12px; display:grid; gap:8px; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px;">
           <div class="evo-row">
             <div id="evoDiamonds">${this.buildEvoDiamonds(b.evoLevel || 0)}</div>
-            <small id="evoHint" style="opacity:.8;">Evolucion: ${b.evoLevel || 0}/5 (+${b.evoLevel || 0}%)</small>
+            <small id="evoHint" style="opacity:.8;">Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}\u2605: ${Math.max(0, Math.min(5, evoLevel || 0))}/5 (${initialEvoStatsLabel})</small>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button id="bldEvolve" style="
@@ -2524,10 +2845,16 @@ class MainScene extends Phaser.Scene {
       : (baseRarity === 5 ? 5 : 0);
     const displayRarity = (baseRarity === 5 && evoStage >= 6) ? 6 : baseRarity;
     const evoActive = (evoLevel > 0) || (evoStage >= 6);
+    const maxLabel = `Max ${displayRarity}\u2605`;
+    const maxColorFrameClass = (displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5)
+      ? ` maxed-${displayRarity}`
+      : "";
     const frameClass = displayRarity === 6
       ? `preview-frame frame-6${(evoLevel >= 5) ? " frame-6max" : ""}${evoActive ? " evo-on" : ""}`
-      : `preview-frame frame-${displayRarity}${evoActive ? " evo-on" : ""}`;
-    const chromeClass = (displayRarity === 6 && evoLevel >= 5) ? "preview-inner chrome" : "preview-inner";
+      : `preview-frame frame-${displayRarity}${evoActive ? " evo-on" : ""}${maxColorFrameClass}`;
+    const chromeClass = (displayRarity === 6 && evoLevel >= 5)
+      ? "preview-inner chrome"
+      : ((displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5) ? `preview-inner chrome-${displayRarity}` : "preview-inner");
     const starClass = (displayRarity === 6) ? "stars-6" : (displayRarity === 5 ? "stars-5" : "stars-base");
 
     if (!b.isBuilt) {
@@ -2590,19 +2917,19 @@ class MainScene extends Phaser.Scene {
       if (win.className !== winCls) win.className = winCls;
     }
 
-    const totalEvo = (evoStage >= 6) ? (5 + evoLevelClamped) : evoLevelClamped;
+    const evoStats = this.getEvolutionStats(b.typeKey, evoStage, evoLevelClamped);
     if (evoDiamonds) evoDiamonds.innerHTML = this.buildEvoDiamonds(evoLevelClamped);
-    if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}\u2605: ${evoLevelClamped}/5 (+${totalEvo}%)`;
+    if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}\u2605: ${evoLevelClamped}/5 (${evoStats.bonusLabel})`;
     if (evoBtn) {
       if (!b.isBuilt) {
         evoBtn.setAttribute("disabled", "true");
         evoBtn.textContent = "En construccion";
-      } else if (baseRarity < 5) {
-        evoBtn.setAttribute("disabled", "true");
-        evoBtn.textContent = "Solo 5\u2605";
       } else if (evoStage >= 6 && evoLevelClamped >= 5) {
         evoBtn.setAttribute("disabled", "true");
-        evoBtn.textContent = "Max";
+        evoBtn.textContent = maxLabel;
+      } else if (evoLevelClamped >= 5) {
+        evoBtn.setAttribute("disabled", "true");
+        evoBtn.textContent = maxLabel;
       } else {
         evoBtn.removeAttribute("disabled");
         evoBtn.textContent = "Evolucionar";
@@ -2629,6 +2956,11 @@ class MainScene extends Phaser.Scene {
 
     b.rotationStep = ((b.rotationStep || 0) + 1) % 4;
 
+    if (b.sprite) {
+      this.updateBuildingSpriteVisual(b);
+      return;
+    }
+
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     const borders = [0x22c55e, 0x60a5fa, 0xf59e0b, 0xf472b6];
     b.border = borders[b.rotationStep];
@@ -2649,10 +2981,12 @@ class MainScene extends Phaser.Scene {
 
     freeBuilding(id);
     b.gfx.setVisible(false);
+    b.sprite?.setVisible(false);
 
     this.moveMode = {
       id,
       size: b.size,
+      typeKey: b.typeKey,
       from: { r: min.r, c: min.c },
       border: b.border || 0x22c55e,
       rotationStep: b.rotationStep || 0
@@ -2666,7 +3000,10 @@ class MainScene extends Phaser.Scene {
   renderMoveGhost(tile) {
     if (!this.moveMode) return;
     this.moveGhost.clear();
-    if (!tile) return;
+    if (!tile) {
+      this.moveGhostSprite?.setVisible(false);
+      return;
+    }
 
     const ok = canPlace(this.moveMode.size, tile.r, tile.c);
     const color = ok ? 0xf59e0b : 0xf87171;
@@ -2678,6 +3015,11 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.drawCells(this.moveGhost, cells, color, 0.35, color);
+    if (this.isSpriteBuilding(this.moveMode.typeKey) && this.moveMode.size === 1) {
+      this.placeSpriteAtTile(this.moveGhostSprite, this.moveMode.typeKey, this.moveMode.rotationStep || 0, tile.r, tile.c, ok ? 0.56 : 0.42);
+    } else {
+      this.moveGhostSprite?.setVisible(false);
+    }
   }
 
   finishMoveAt(r0, c0) {
@@ -2691,10 +3033,24 @@ class MainScene extends Phaser.Scene {
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     b.gfx.clear();
-    this.drawCells(b.gfx, b.cells, def.fill, 0.85, b.border);
-    b.gfx.setVisible(true);
+    if (b.sprite) {
+      if (b.isBuilt) {
+        this.updateBuildingSpriteVisual(b);
+        b.sprite.setVisible(true);
+        b.gfx.setVisible(false);
+      } else {
+        this.updateBuildingSpriteVisual(b, 0.3);
+        b.sprite.setVisible(true);
+        this.drawCells(b.gfx, b.cells, def.fill, 0.25, 0x64748b);
+        b.gfx.setVisible(true);
+      }
+    } else {
+      this.drawCells(b.gfx, b.cells, def.fill, 0.85, b.border);
+      b.gfx.setVisible(true);
+    }
 
     this.moveGhost.clear();
+    this.moveGhostSprite?.setVisible(false);
     this.moveMode = null;
     this.modeText.setText(this.modeLabel());
   }
@@ -2712,11 +3068,25 @@ class MainScene extends Phaser.Scene {
 
       const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
       b.gfx.clear();
-      this.drawCells(b.gfx, b.cells, def.fill, 0.85, border);
-      b.gfx.setVisible(true);
+      if (b.sprite) {
+        if (b.isBuilt) {
+          this.updateBuildingSpriteVisual(b);
+          b.sprite.setVisible(true);
+          b.gfx.setVisible(false);
+        } else {
+          this.updateBuildingSpriteVisual(b, 0.3);
+          b.sprite.setVisible(true);
+          this.drawCells(b.gfx, b.cells, def.fill, 0.25, 0x64748b);
+          b.gfx.setVisible(true);
+        }
+      } else {
+        this.drawCells(b.gfx, b.cells, def.fill, 0.85, border);
+        b.gfx.setVisible(true);
+      }
     }
 
     this.moveGhost.clear();
+    this.moveGhostSprite?.setVisible(false);
     this.moveMode = null;
     this.modeText.setText(this.modeLabel());
   }
@@ -2738,6 +3108,7 @@ class MainScene extends Phaser.Scene {
     }
 
     b.gfx.destroy();
+    b.sprite?.destroy();
     b.buildBar?.destroy();
     b.prodBar?.destroy();
     b.glowGfx?.destroy();
@@ -2811,6 +3182,15 @@ class MainScene extends Phaser.Scene {
     // [OK] UI cam NO renderiza edificios
     this.uiCam.ignore(gfx);
 
+    let sprite = null;
+    const spriteTexture = this.getSpriteTextureForBuilding(typeKey, 0);
+    if (spriteTexture) {
+      sprite = this.add.image(0, 0, spriteTexture)
+        .setOrigin(0.5, 0.9)
+        .setVisible(true);
+      this.uiCam.ignore(sprite);
+    }
+
     // ===== barras en mundo =====
     const buildBar = this.add.graphics();
     const prodBar = this.add.graphics();
@@ -2871,6 +3251,7 @@ class MainScene extends Phaser.Scene {
       size,
       cells,
       gfx,
+      sprite,
       buildBar,
       prodBar,
       rewardGoldIcon,
@@ -2890,8 +3271,22 @@ class MainScene extends Phaser.Scene {
       prodCycle,
       prodStart: effBuild <= 0 ? now : buildEnd, // empieza cuando termina de construir
       lastRewardAt: 0,
-      border: def.border
+      border: def.border,
+      rotationStep: 0
     });
+
+    const b = buildings.get(id);
+    if (b?.sprite) {
+      this.updateBuildingSpriteVisual(b, b.isBuilt ? 1 : 0.3);
+      if (b.isBuilt) {
+        b.gfx.clear();
+        b.gfx.setVisible(false);
+        b.sprite.setVisible(true);
+      } else {
+        b.sprite.setVisible(true);
+        b.gfx.setVisible(true);
+      }
+    }
   }
 
   getBuildingAnchor(b) {
@@ -3083,6 +3478,8 @@ class MainScene extends Phaser.Scene {
       const barHalf = barWidth / 2;
       const barHeight = 10;
       const barRadius = 5;
+      const barLeft = Math.round(barX - barHalf);
+      const barTop = Math.round(barY);
 
       // ===== Construccion =====
       if (!b.isBuilt) {
@@ -3095,14 +3492,23 @@ class MainScene extends Phaser.Scene {
         b.prodBar.clear();
         b.rewardGoldIcon?.setVisible(false);
         b.rewardExpIcon?.setVisible(false);
+        if (b.sprite) {
+          const ghostAlpha = 0.2 + (0.45 * Phaser.Math.Clamp(done, 0, 1));
+          this.updateBuildingSpriteVisual(b, ghostAlpha);
+          b.sprite.setVisible(true);
+          b.gfx.setVisible(true);
+        }
 
         // fondo
         b.buildBar.fillStyle(0x0b1222, 0.8);
-        b.buildBar.fillRoundedRect(barX - barHalf, barY, barWidth, barHeight, barRadius);
+        b.buildBar.fillRoundedRect(barLeft, barTop, barWidth, barHeight, barRadius);
 
         // progreso
-        b.buildBar.fillStyle(0xfbbf24, 1);
-        b.buildBar.fillRoundedRect(barX - barHalf, barY, barWidth * Phaser.Math.Clamp(done, 0, 1), barHeight, barRadius);
+        const buildFillW = Math.floor(barWidth * Phaser.Math.Clamp(done, 0, 1));
+        if (buildFillW >= 2) {
+          b.buildBar.fillStyle(0xfbbf24, 1);
+          b.buildBar.fillRect(barLeft, barTop, buildFillW, barHeight);
+        }
 
         // listo
         if (remain <= 0) {
@@ -3112,7 +3518,15 @@ class MainScene extends Phaser.Scene {
           b.buildBar.clear();
           // reemplaza ghost por edificio final
           b.gfx.clear();
-          this.drawCells(b.gfx, b.cells, def.fill, 0.85, def.border);
+          if (b.sprite) {
+            this.updateBuildingSpriteVisual(b);
+            b.sprite.setAlpha(1);
+            b.sprite.setVisible(true);
+            b.gfx.setVisible(false);
+          } else {
+            this.drawCells(b.gfx, b.cells, def.fill, 0.85, def.border);
+            b.gfx.setVisible(true);
+          }
         }
 
         this.updateBuildingInfoModal(b, def, now);
@@ -3138,13 +3552,22 @@ class MainScene extends Phaser.Scene {
         p01 = 1;
       }
 
+      if (b.sprite) {
+        this.updateBuildingSpriteVisual(b, 1);
+        b.sprite.setVisible(true);
+        b.gfx.setVisible(false);
+      }
+
       // barra produccion
       b.prodBar.clear();
       b.prodBar.fillStyle(0x0b1222, 0.75);
-      b.prodBar.fillRoundedRect(barX - barHalf, barY, barWidth, barHeight, barRadius);
+      b.prodBar.fillRoundedRect(barLeft, barTop, barWidth, barHeight, barRadius);
 
-      b.prodBar.fillStyle(0x22c55e, 1);
-      b.prodBar.fillRoundedRect(barX - barHalf, barY, barWidth * Phaser.Math.Clamp(p01, 0, 1), barHeight, barRadius);
+      const prodFillW = Math.floor(barWidth * Phaser.Math.Clamp(p01, 0, 1));
+      if (prodFillW >= 2) {
+        b.prodBar.fillStyle(0x22c55e, 1);
+        b.prodBar.fillRect(barLeft, barTop, prodFillW, barHeight);
+      }
 
       // iconos de recompensa (manual)
       const showReward = !!b.rewardReady;
