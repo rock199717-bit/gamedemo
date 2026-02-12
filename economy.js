@@ -2,42 +2,43 @@
 // ECONOMY SYSTEM (FULL)
 // - Oro + Level/EXP con barra
 // - Deseos separados (Perm / Lim)
-// - Modal Gachapon con animación (abrir/cerrar)
-// - Banner Permanente: 4★ (Verde/Rojo/Azul 4x4) y 5★ (Verde/Rojo/Azul 9x9)
+// - Modal Gachapon con animaci\u00F3n (abrir/cerrar)
+// - Banner Permanente: 4\u2605 (Verde/Rojo/Azul 4x4) y 5\u2605 (Verde/Rojo/Azul 9x9)
 // - DEV buttons: +10 Perm / +10 Lim
-// - Inventario básico (se muestra en modal)
+// - Inventario b\u00E1sico (se muestra en modal)
 // - No gasta tickets ni da oro/exp por tirar deseos (solo da items).
 // =========================
 
 const MAX_LEVEL = 100;
+const GACHA_BTN_TEXTURE_KEY = "ui_gachapon_btn";
 
-// ===== ITEMS (lo que “sale” del gachapon / banner) =====
+// ===== ITEMS (lo que \u201Csale\u201D del gachapon / banner) =====
 const ITEM_DEFS = {
-  // ===== VERDE (1★/2★/3★) =====
-  green_1:       { key: "green_1",       name: "Verde 1x1",     icon: "🟩", size: 1, rarity: 1 },
-  green_2:       { key: "green_2",       name: "Verde 2x2",     icon: "🟩", size: 2, rarity: 2 },
-  green_3:       { key: "green_3",       name: "Verde 3x3",     icon: "🟩", size: 3, rarity: 3 },
-  green_4:       { key: "green_4",       name: "Verde 4x4",     icon: "🟩✨", size: 4, rarity: 4 },
-  // ===== ROJO (1★/2★/3★/4★) =====
-  red_1:         { key: "red_1",         name: "Rojo 1x1",      icon: "🟥", size: 1, rarity: 1 },
-  red_2:         { key: "red_2",         name: "Rojo 2x2",      icon: "🟥", size: 2, rarity: 2 },
-  red_3:         { key: "red_3",         name: "Rojo 3x3",      icon: "🟥", size: 3, rarity: 3 },
-  red_4:         { key: "red_4",         name: "Rojo 4x4",      icon: "🟥✨", size: 4, rarity: 4 },
-  // ===== AZUL (1★/2★/3★/4★) =====
-  blue_1:        { key: "blue_1",        name: "Azul 1x1",      icon: "🟦", size: 1, rarity: 1 },
-  blue_2:        { key: "blue_2",        name: "Azul 2x2",      icon: "🟦", size: 2, rarity: 2 },
-  blue_3:        { key: "blue_3",        name: "Azul 3x3",      icon: "🟦", size: 3, rarity: 3 },
-  blue_4:        { key: "blue_4",        name: "Azul 4x4",      icon: "🟦✨", size: 4, rarity: 4 },
+  // ===== VERDE (1\u2605/2\u2605/3\u2605) =====
+  green_1:       { key: "green_1",       name: "Verde 1x1",     icon: "\uD83D\uDFE9", size: 1, rarity: 1 },
+  green_2:       { key: "green_2",       name: "Verde 2x2",     icon: "\uD83D\uDFE9", size: 2, rarity: 2 },
+  green_3:       { key: "green_3",       name: "Verde 3x3",     icon: "\uD83D\uDFE9", size: 3, rarity: 3 },
+  green_4:       { key: "green_4",       name: "Verde 4x4",     icon: "\uD83D\uDFE9\u2728", size: 4, rarity: 4 },
+  // ===== ROJO (1\u2605/2\u2605/3\u2605/4\u2605) =====
+  red_1:         { key: "red_1",         name: "Rojo 1x1",      icon: "\uD83D\uDFE5", size: 1, rarity: 1 },
+  red_2:         { key: "red_2",         name: "Rojo 2x2",      icon: "\uD83D\uDFE5", size: 2, rarity: 2 },
+  red_3:         { key: "red_3",         name: "Rojo 3x3",      icon: "\uD83D\uDFE5", size: 3, rarity: 3 },
+  red_4:         { key: "red_4",         name: "Rojo 4x4",      icon: "\uD83D\uDFE5\u2728", size: 4, rarity: 4 },
+  // ===== AZUL (1\u2605/2\u2605/3\u2605/4\u2605) =====
+  blue_1:        { key: "blue_1",        name: "Azul 1x1",      icon: "\uD83D\uDFE6", size: 1, rarity: 1 },
+  blue_2:        { key: "blue_2",        name: "Azul 2x2",      icon: "\uD83D\uDFE6", size: 2, rarity: 2 },
+  blue_3:        { key: "blue_3",        name: "Azul 3x3",      icon: "\uD83D\uDFE6", size: 3, rarity: 3 },
+  blue_4:        { key: "blue_4",        name: "Azul 4x4",      icon: "\uD83D\uDFE6\u2728", size: 4, rarity: 4 },
 
-  // ===== 5★ permanente =====
+  // ===== 5\u2605 permanente =====
   perm_green_9:  {
     key: "perm_green_9",
     name: "Verde 9x9",
-    icon: "🟩✨",
+    icon: "\uD83D\uDFE9\u2728",
     size: 9,
     rarity: 5,
     cardTag: "Bosque Sagrado",
-    cardSigil: "🌿",
+    cardSigil: "\uD83C\uDF3F",
     cardBg1: "#0b3b2c",
     cardBg2: "#052e1b",
     cardAccent: "#22c55e"
@@ -45,11 +46,11 @@ const ITEM_DEFS = {
   perm_blue_9:  {
     key: "perm_blue_9",
     name: "Azul 9x9",
-    icon: "🟦✨",
+    icon: "\uD83D\uDFE6\u2728",
     size: 9,
     rarity: 5,
     cardTag: "Marea Celeste",
-    cardSigil: "🌊",
+    cardSigil: "\uD83C\uDF0A",
     cardBg1: "#0b2a4a",
     cardBg2: "#0b1222",
     cardAccent: "#38bdf8"
@@ -57,25 +58,25 @@ const ITEM_DEFS = {
   perm_red_9:  {
     key: "perm_red_9",
     name: "Rojo 9x9",
-    icon: "🟥✨",
+    icon: "\uD83D\uDFE5\u2728",
     size: 9,
     rarity: 5,
-    cardTag: "Corazón Ígneo",
-    cardSigil: "🔥",
+    cardTag: "Coraz\u00F3n \u00CDgneo",
+    cardSigil: "\uD83D\uDD25",
     cardBg1: "#3b0a0a",
     cardBg2: "#2b0606",
     cardAccent: "#ef4444"
   },
 
-  // ===== 5★ limitado =====
+  // ===== 5\u2605 limitado =====
   lim_gold_2:    {
     key: "lim_gold_2",
     name: "Dorado 9x9",
-    icon: "🟨✨",
+    icon: "\uD83D\uDFE8\u2728",
     size: 9,
     rarity: 5,
     cardTag: "Sol Dorado",
-    cardSigil: "☀️",
+    cardSigil: "\u2600\uFE0F",
     cardBg1: "#4a2100",
     cardBg2: "#7c2d12",
     cardAccent: "#f59e0b"
@@ -108,16 +109,16 @@ class EconomySystem {
       green_4: 1
     };
 
-    // ===== Pity / garantías =====
-    // 4★: garantizado cada 10 (base 8%)
-    // 5★: 2% y garantizado cada 50
+    // ===== Pity / garant\u00EDas =====
+    // 4\u2605: garantizado cada 10 (base 8%)
+    // 5\u2605: 2% y garantizado cada 50
     this.permPity4 = 0;
     this.permPity5 = 0;
 
     this.limPity4 = 0;
     this.limPity5 = 0;
 
-    // Si pierdes 50/50 en limitado, el siguiente 5★ es del banner
+    // Si pierdes 50/50 en limitado, el siguiente 5\u2605 es del banner
     this.limGuaranteeFeatured = false;
 
     // ===== UI =====
@@ -126,14 +127,14 @@ class EconomySystem {
     this.ensureInventoryButton();
     this.ensureAdminButton();
 
-    // ===== Banner Permanente: sin barra de carga (se quitó el ciclo) =====
+    // ===== Banner Permanente: sin barra de carga (se quit\u00F3 el ciclo) =====
   }
 
   // =========================
   // EXP / LEVEL
   // =========================
   calcExpToNext() {
-    // curva para que se ponga más difícil y nivel 100 sea duro
+    // curva para que se ponga m\u00E1s dif\u00EDcil y nivel 100 sea duro
     return Math.floor(120 * Math.pow(this.level, 1.45));
   }
 
@@ -295,10 +296,10 @@ class EconomySystem {
       <div class="inv-card admin-card">
         <div class="inv-header">
           <div class="inv-title">Admin Items</div>
-          <button id="adminClose" class="inv-x">✖</button>
+          <button id="adminClose" class="inv-x">\u2716</button>
         </div>
         <div id="adminList" class="inv-list admin-list"></div>
-        <small class="inv-hint">Toca un item para añadirlo al inventario.</small>
+        <small class="inv-hint">Toca un item para a\u00F1adirlo al inventario.</small>
       </div>
     `;
 
@@ -325,8 +326,8 @@ class EconomySystem {
       return `
         <button class="inv-row" data-admin="${k}">
           <span class="inv-left">
-            <span class="inv-name">${def.icon || "❖"} ${def.name || k}</span>
-            <span class="inv-meta">${def.size}x${def.size} • ${def.rarity}★ • en inv: ${c}</span>
+            <span class="inv-name">${def.icon || "\u2756"} ${def.name || k}</span>
+            <span class="inv-meta">${def.size}x${def.size} \u2022 ${def.rarity}\u2605 \u2022 en inv: ${c}</span>
           </span>
           <span class="inv-count">+1</span>
         </button>
@@ -355,7 +356,7 @@ class EconomySystem {
       <div class="inv-card">
         <div class="inv-header">
           <div class="inv-title">Inventario</div>
-          <button id="invClose" class="inv-x">✖</button>
+          <button id="invClose" class="inv-x">\u2716</button>
         </div>
         <div id="invList" class="inv-list"></div>
         <small class="inv-hint">Toca un item para construir.</small>
@@ -378,6 +379,7 @@ class EconomySystem {
 
   selectBuildItem(key) {
     if (!key || !this.scene) return;
+    if (document.getElementById("building-modal") || document.getElementById("evo-modal")) return;
     this.scene.selectedBuildKey = key;
     this.scene.setBuildMode?.();
   }
@@ -394,7 +396,7 @@ class EconomySystem {
         <button class="inv-row ${disabled ? "is-empty" : ""}" data-item="${k}" ${disabled ? "disabled" : ""}>
           <div class="inv-left">
             <div class="inv-name">${def.icon} ${def.name}</div>
-            <div class="inv-meta">${def.size}x${def.size} • ${def.rarity}★</div>
+            <div class="inv-meta">${def.size}x${def.size} \u2022 ${def.rarity}\u2605</div>
           </div>
           <div class="inv-count">x ${c}</div>
         </button>
@@ -418,7 +420,7 @@ class EconomySystem {
 
     const style = (bg = "#020617") => ({
       fontFamily: "Arial",
-      fontSize: "14px",
+      fontSize: "16px",
       color: "#e5e7eb",
       backgroundColor: bg
     });
@@ -468,23 +470,124 @@ class EconomySystem {
       .setScrollFactor(0)
       .setDepth(9999);
 
-    // Botón Gacha (solo abre ventana)
-    this.gachaBtn = s.add.text(0, 12, "🎰 Gachapon", {
-      fontFamily: "Arial",
-      fontSize: "14px",
-      color: "#022c22",
-      backgroundColor: "#22c55e"
-    })
-      .setOrigin(1, 0)
-      .setPadding(10, 6)
-      .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(9999);
+    // Boton Gacha (imagen custom + animaciones)
+    this.gachaBtnIsImage = !!s.textures?.exists?.(GACHA_BTN_TEXTURE_KEY);
+    this.gachaBtnHovering = false;
+    this.gachaBtnBaseScale = 1;
+    this.gachaBtnPulseTween = null;
+    this.gachaBtnScaleTween = null;
+    this.gachaBtnGlowTween = null;
+    this.gachaBtnPressTween = null;
+    this.gachaOpenPending = false;
+
+    if (this.gachaBtnIsImage) {
+      this.gachaBtnGlow = s.add.image(0, 12, GACHA_BTN_TEXTURE_KEY)
+        .setOrigin(1, 0)
+        .setScrollFactor(0)
+        .setDepth(9998)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(0xbffaff)
+        .setAlpha(0);
+
+      this.gachaBtn = s.add.image(0, 12, GACHA_BTN_TEXTURE_KEY)
+        .setOrigin(1, 0)
+        .setScrollFactor(0)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(9999);
+
+      const stopBtnTween = (key) => {
+        if (this[key]) {
+          this[key].stop();
+          this[key] = null;
+        }
+      };
+
+      const syncGlow = () => {
+        if (!this.gachaBtnGlow || !this.gachaBtn) return;
+        this.gachaBtnGlow.setPosition(this.gachaBtn.x, this.gachaBtn.y);
+      };
+
+      const hoverScale = () => this.gachaBtnBaseScale * 1.03;
+      const idleScale = () => this.gachaBtnBaseScale;
+
+      this.gachaBtn.on("pointerover", () => {
+        this.gachaBtnHovering = true;
+        stopBtnTween("gachaBtnPressTween");
+        stopBtnTween("gachaBtnScaleTween");
+        stopBtnTween("gachaBtnGlowTween");
+        stopBtnTween("gachaBtnPulseTween");
+
+        this.gachaBtnScaleTween = s.tweens.add({
+          targets: this.gachaBtn,
+          scaleX: hoverScale(),
+          scaleY: hoverScale(),
+          duration: 140,
+          ease: "Quad.Out"
+        });
+
+        if (this.gachaBtnGlow) {
+          syncGlow();
+          this.gachaBtnGlow.setScale(this.gachaBtnBaseScale * 1.08);
+          this.gachaBtnGlowTween = s.tweens.add({
+            targets: this.gachaBtnGlow,
+            alpha: 0.22,
+            duration: 150,
+            ease: "Quad.Out"
+          });
+          this.gachaBtnPulseTween = s.tweens.add({
+            targets: this.gachaBtnGlow,
+            alpha: { from: 0.18, to: 0.34 },
+            duration: 620,
+            ease: "Sine.easeInOut",
+            yoyo: true,
+            repeat: -1
+          });
+        }
+      });
+
+      this.gachaBtn.on("pointerout", () => {
+        this.gachaBtnHovering = false;
+        stopBtnTween("gachaBtnPressTween");
+        stopBtnTween("gachaBtnPulseTween");
+        stopBtnTween("gachaBtnScaleTween");
+        stopBtnTween("gachaBtnGlowTween");
+
+        this.gachaBtnScaleTween = s.tweens.add({
+          targets: this.gachaBtn,
+          scaleX: idleScale(),
+          scaleY: idleScale(),
+          duration: 140,
+          ease: "Quad.Out"
+        });
+
+        if (this.gachaBtnGlow) {
+          this.gachaBtnGlowTween = s.tweens.add({
+            targets: this.gachaBtnGlow,
+            alpha: 0,
+            duration: 160,
+            ease: "Quad.Out"
+          });
+        }
+      });
+    } else {
+      // fallback: texto si la textura no esta disponible
+      this.gachaBtn = s.add.text(0, 12, "\uD83C\uDFB0 Gachapon", {
+        fontFamily: "Arial",
+        fontSize: "16px",
+        color: "#022c22",
+        backgroundColor: "#22c55e"
+      })
+        .setOrigin(1, 0)
+        .setPadding(10, 6)
+        .setScrollFactor(0)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(9999);
+    }
 
     // DEV buttons
     this.devPermBtn = s.add.text(0, 52, "+10 Perm (DEV)", {
       fontFamily: "Arial",
-      fontSize: "12px",
+      fontSize: "14px",
       color: "#022c22",
       backgroundColor: "#facc15"
     })
@@ -496,7 +599,7 @@ class EconomySystem {
 
     this.devLimitedBtn = s.add.text(0, 52, "+10 Lim (DEV)", {
       fontFamily: "Arial",
-      fontSize: "12px",
+      fontSize: "14px",
       color: "#022c22",
       backgroundColor: "#f59e0b"
     })
@@ -508,7 +611,7 @@ class EconomySystem {
 
     this.devExpBtn = s.add.text(0, 52, "+50 EXP (DEV)", {
       fontFamily: "Arial",
-      fontSize: "12px",
+      fontSize: "14px",
       color: "#022c22",
       backgroundColor: "#38bdf8"
     })
@@ -521,7 +624,33 @@ class EconomySystem {
     // Click: abrir modal
     this.gachaBtn.on("pointerdown", (pointer) => {
       s.uiGuard?.(pointer);
-      this.openGachaModal();
+      if (this.gachaBtnIsImage) {
+        if (this.gachaBtnPressTween) {
+          this.gachaBtnPressTween.stop();
+          this.gachaBtnPressTween = null;
+        }
+        const target = this.gachaBtnHovering ? (this.gachaBtnBaseScale * 1.03) : this.gachaBtnBaseScale;
+        this.gachaBtnPressTween = s.tweens.add({
+          targets: this.gachaBtn,
+          scaleX: this.gachaBtnBaseScale * 0.95,
+          scaleY: this.gachaBtnBaseScale * 0.95,
+          duration: 70,
+          ease: "Quad.Out",
+          yoyo: true,
+          hold: 20,
+          onComplete: () => {
+            this.gachaBtn.setScale(target);
+            this.gachaBtnPressTween = null;
+          }
+        });
+      }
+
+      if (this.gachaOpenPending) return;
+      this.gachaOpenPending = true;
+      s.time.delayedCall(this.gachaBtnIsImage ? 95 : 0, () => {
+        this.gachaOpenPending = false;
+        this.openGachaModal();
+      });
     });
 
     // DEV: sumar deseos
@@ -556,11 +685,12 @@ class EconomySystem {
       this.expBarFill,
       this.permWishText,
       this.limitedWishText,
+      this.gachaBtnGlow,
       this.gachaBtn,
       this.devPermBtn,
       this.devLimitedBtn,
       this.devExpBtn
-    ];
+    ].filter(Boolean);
 
     if (Array.isArray(s.uiObjects)) {
       s.uiObjects.push(...uiList);
@@ -581,22 +711,38 @@ class EconomySystem {
     const isTiny = w <= 720;
     const top = isCompact ? 6 : 10;
 
-    const fontSize = isTiny ? 11 : (isCompact ? 12 : 14);
-    const smallFont = isTiny ? 10 : (isCompact ? 11 : 12);
-    const padX = isTiny ? 6 : (isCompact ? 7 : 8);
-    const padY = isTiny ? 4 : (isCompact ? 5 : 6);
+    const fontSize = isTiny ? 13 : (isCompact ? 14 : 16);
+    const smallFont = isTiny ? 12 : (isCompact ? 13 : 14);
+    const padX = isTiny ? 7 : (isCompact ? 8 : 9);
+    const padY = isTiny ? 5 : (isCompact ? 6 : 7);
 
     const apply = (el, f = fontSize, px = padX, py = padY) => {
       if (!el) return;
-      el.setFontSize(f);
-      el.setPadding(px, py);
+      if (typeof el.setFontSize === "function") el.setFontSize(f);
+      if (typeof el.setPadding === "function") el.setPadding(px, py);
+    };
+    const getUIWidth = (el) => (el?.displayWidth ?? el?.width ?? 0);
+    const syncGachaGlowPos = () => {
+      if (!this.gachaBtnGlow || !this.gachaBtn) return;
+      this.gachaBtnGlow.setPosition(this.gachaBtn.x, this.gachaBtn.y);
     };
 
     apply(this.goldText);
     apply(this.levelText);
     apply(this.permWishText);
     apply(this.limitedWishText);
-    apply(this.gachaBtn, fontSize, padX + 2, padY);
+    if (this.gachaBtnIsImage) {
+      const targetH = isTiny ? 34 : (isCompact ? 40 : 46);
+      this.gachaBtnBaseScale = targetH / this.gachaBtn.height;
+      const hoverMul = this.gachaBtnHovering ? 1.03 : 1;
+      this.gachaBtn.setScale(this.gachaBtnBaseScale * hoverMul);
+      if (this.gachaBtnGlow) {
+        this.gachaBtnGlow.setScale(this.gachaBtnBaseScale * 1.08);
+        if (!this.gachaBtnHovering) this.gachaBtnGlow.setAlpha(0);
+      }
+    } else {
+      apply(this.gachaBtn, fontSize, padX + 2, padY);
+    }
     apply(this.devPermBtn, smallFont, padX, Math.max(3, padY - 1));
     apply(this.devLimitedBtn, smallFont, padX, Math.max(3, padY - 1));
     apply(this.devExpBtn, smallFont, padX, Math.max(3, padY - 1));
@@ -623,8 +769,9 @@ class EconomySystem {
       topRow.forEach((el) => {
         el.y = top;
         el.x = x;
-        x -= (el.width + 10);
+        x -= (getUIWidth(el) + 10);
       });
+      syncGachaGlowPos();
 
       // exp bar debajo del level
       this.expBarBg.x = this.levelText.x;
@@ -642,10 +789,10 @@ class EconomySystem {
       this.devExpBtn.x = right;
       this.devExpBtn.y = top + 68;
 
-      this.devLimitedBtn.x = this.devExpBtn.x - (this.devExpBtn.width + 10);
+      this.devLimitedBtn.x = this.devExpBtn.x - (getUIWidth(this.devExpBtn) + 10);
       this.devLimitedBtn.y = this.devExpBtn.y;
 
-      this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 10);
+      this.devPermBtn.x = this.devLimitedBtn.x - (getUIWidth(this.devLimitedBtn) + 10);
       this.devPermBtn.y = this.devLimitedBtn.y;
       return;
     }
@@ -660,8 +807,9 @@ class EconomySystem {
     row1.forEach((el) => {
       el.y = top;
       el.x = x;
-      x -= (el.width + 8);
+      x -= (getUIWidth(el) + 8);
     });
+    syncGachaGlowPos();
 
     const expBarY = top + 22;
     const expTextY = top + 34;
@@ -681,17 +829,17 @@ class EconomySystem {
     row2.forEach((el) => {
       el.y = row2Y;
       el.x = x;
-      x -= (el.width + 8);
+      x -= (getUIWidth(el) + 8);
     });
 
     const devY = row2Y + 26;
     this.devExpBtn.x = right;
     this.devExpBtn.y = devY;
 
-    this.devLimitedBtn.x = this.devExpBtn.x - (this.devExpBtn.width + 8);
+    this.devLimitedBtn.x = this.devExpBtn.x - (getUIWidth(this.devExpBtn) + 8);
     this.devLimitedBtn.y = this.devExpBtn.y;
 
-    this.devPermBtn.x = this.devLimitedBtn.x - (this.devLimitedBtn.width + 8);
+    this.devPermBtn.x = this.devLimitedBtn.x - (getUIWidth(this.devLimitedBtn) + 8);
     this.devPermBtn.y = this.devLimitedBtn.y;
   }
 
@@ -702,12 +850,12 @@ class EconomySystem {
   }
 
   refreshUI() {
-    this.goldText.setText(`💰 ${this.gold}`);
-    this.levelText.setText(`⭐ Lv.${this.level}`);
+    this.goldText.setText(`\uD83D\uDCB0 ${this.gold}`);
+    this.levelText.setText(`\u2B50 Lv.${this.level}`);
 
     // deseos separados
-    this.permWishText.setText(`🎟 Perm: ${this.wishesPermanent}`);
-    this.limitedWishText.setText(`⏳ Lim: ${this.wishesLimited}`);
+    this.permWishText.setText(`\uD83C\uDF9F Perm: ${this.wishesPermanent}`);
+    this.limitedWishText.setText(`\u23F3 Lim: ${this.wishesLimited}`);
 
     // exp text + bar
     const cur = this.exp;
@@ -722,7 +870,7 @@ class EconomySystem {
       this.setExpBarRatio(ratio);
     }
 
-    // si cambió el texto, recalcula layout (por anchos)
+    // si cambi\u00F3 el texto, recalcula layout (por anchos)
     this.layoutHorizontal();
   }
 
@@ -750,7 +898,7 @@ class EconomySystem {
     const win = Phaser.Math.FloatBetween(0, 1) < 0.5;
     if (win) return "lim_gold_2";
 
-    // pierde 50/50 => siguiente 5★ garantizado
+    // pierde 50/50 => siguiente 5\u2605 garantizado
     this.limGuaranteeFeatured = true;
     return this.pickPermanentFiveStarKey();
   }
@@ -768,27 +916,27 @@ class EconomySystem {
 
     let rarity = 2;
 
-    // 5★: 2% o garantía a los 50
+    // 5\u2605: 2% o garant\u00EDa a los 50
     const hit5 = (Phaser.Math.FloatBetween(0, 1) < 0.006) || (pity5 >= 50);
     if (hit5) rarity = 5;
     else {
-      // 4★: garantía cada 10 (y una chance base)
+      // 4\u2605: garant\u00EDa cada 10 (y una chance base)
       const hit4 = (Phaser.Math.FloatBetween(0, 1) < 0.08) || (pity4 >= 10);
       if (hit4) rarity = 4;
       else if (!isLimited) {
-        // permanente: 1★/2★/3★ = 40% / 30% / 30%
+        // permanente: 1\u2605/2\u2605/3\u2605 = 40% / 30% / 30%
         const r = Phaser.Math.FloatBetween(0, 1);
         if (r < 0.40) rarity = 1;
         else if (r < 0.70) rarity = 2;
         else rarity = 3;
       } else {
-        // limitado: sin 1★ -> 3★ 70% / 2★ 30%
+        // limitado: sin 1\u2605 -> 3\u2605 70% / 2\u2605 30%
         const r = Phaser.Math.FloatBetween(0, 1);
         rarity = (r < 0.70) ? 3 : 2;
       }
     }
 
-    // reset pity según rarity
+    // reset pity seg\u00FAn rarity
     if (rarity >= 4) pity4 = 0;
     if (rarity === 5) pity5 = 0;
 
@@ -800,7 +948,7 @@ class EconomySystem {
       this.permPity5 = pity5;
     }
 
-    // --- decide itemKey según banner + rareza ---
+    // --- decide itemKey seg\u00FAn banner + rareza ---
     let itemKey = "green_1"; // base
     if (rarity === 1) {
       const pool = ["green_1", "red_1", "blue_1"];
@@ -1365,7 +1513,7 @@ class EconomySystem {
         background: radial-gradient(circle at 30% 30%, rgba(245,158,11,.65), rgba(245,158,11,0) 60%);
       }
       .result-item.rarity-5::after {
-        content: "✦ ✧ ✦";
+        content: "\u2726 \u2727 \u2726";
         position: absolute;
         top: 6px;
         right: 10px;
@@ -1463,12 +1611,12 @@ class EconomySystem {
   }
 
   renderWishStageHTML(result) {
-    const def = ITEM_DEFS[result.itemKey] || { name: result.itemKey, icon: "❓", rarity: result.rarity };
+    const def = ITEM_DEFS[result.itemKey] || { name: result.itemKey, icon: "\u2753", rarity: result.rarity };
     const rarity = result.rarity || def.rarity || 2;
     const rarityClass = `rarity-${rarity}`;
     const isLegend = rarity === 5;
     const starSpans = Array.from({ length: rarity }, (_, i) => (
-      `<span class="star" style="--sd:${(i * 0.12).toFixed(2)}s">★</span>`
+      `<span class="star" style="--sd:${(i * 0.12).toFixed(2)}s">\u2605</span>`
     )).join("");
     const cardTag = def.cardTag || "";
     const cardSigil = def.cardSigil || "";
@@ -1485,11 +1633,11 @@ class EconomySystem {
       </div>
       <div class="card-anim ${rarityClass}${isLegend ? " card-legend" : ""}"${cardStyle}>
         <div class="card-back">
-          <div class="mystery">🇵🇪</div>
-          <div class="mystery-sub">☀️</div>
+          <div class="mystery">\uD83C\uDDF5\uD83C\uDDEA</div>
+          <div class="mystery-sub">\u2600\uFE0F</div>
         </div>
         <div class="card-face card-front">
-          ${cardSigil ? `<div class="card-sigil">${cardSigil}</div>` : `<div class="card-icon">${def.icon || "❓"}</div>`}
+          ${cardSigil ? `<div class="card-sigil">${cardSigil}</div>` : `<div class="card-icon">${def.icon || "\u2753"}</div>`}
           <div class="card-name">${def.name || result.itemKey}</div>
           ${cardTag ? `<div class="card-tag">${cardTag}</div>` : ""}
           <div class="card-stars stars-${rarity}">${starSpans}</div>
@@ -1504,15 +1652,15 @@ class EconomySystem {
   }
 
   renderBannerCard(key, opts = {}) {
-    const def = ITEM_DEFS[key] || { name: key, icon: "❓", rarity: 2, size: 1 };
+    const def = ITEM_DEFS[key] || { name: key, icon: "\u2753", rarity: 2, size: 1 };
     const rarity = def.rarity || 2;
-    const stars = "★".repeat(rarity);
-    const badge = opts.badge || (rarity >= 5 ? "5★" : (rarity === 4 ? "4★" : ""));
+    const stars = "\u2605".repeat(rarity);
+    const badge = opts.badge || (rarity >= 5 ? "5\u2605" : (rarity === 4 ? "4\u2605" : ""));
     const large = opts.large ? " large" : "";
     const b1 = def.cardBg1 || (rarity >= 5 ? "#3b0a0a" : "#0f172a");
     const b2 = def.cardBg2 || (rarity >= 5 ? "#0b1222" : "#020617");
     const glow = def.cardAccent || (rarity >= 5 ? "#f59e0b" : (rarity === 4 ? "#a855f7" : "#38bdf8"));
-    const sigil = def.cardSigil || def.icon || "❖";
+    const sigil = def.cardSigil || def.icon || "\u2756";
     const size = def.size ? `${def.size}x${def.size}` : "";
 
     return `
@@ -1528,14 +1676,14 @@ class EconomySystem {
 
   renderWishResultsHTML(results) {
     return results.map((r, idx) => {
-      const def = ITEM_DEFS[r.itemKey] || { name: r.itemKey, icon: "❓", rarity: r.rarity };
+      const def = ITEM_DEFS[r.itemKey] || { name: r.itemKey, icon: "\u2753", rarity: r.rarity };
       const rarity = r.rarity || def.rarity || 2;
-      const stars = "★".repeat(rarity);
+      const stars = "\u2605".repeat(rarity);
       return `
         <div class="result-item rarity-${rarity}" style="--i:${idx}">
-          <div class="result-icon">${def.icon || "❓"}</div>
+          <div class="result-icon">${def.icon || "\u2753"}</div>
           <div>
-            <div class="result-name">#${idx + 1} · ${def.name || r.itemKey}</div>
+            <div class="result-name">#${idx + 1} \u00B7 ${def.name || r.itemKey}</div>
             <div class="result-stars">${stars}</div>
           </div>
         </div>
@@ -1743,7 +1891,7 @@ class EconomySystem {
   }
 
   // =========================
-  // GACHA MODAL (HTML) + Animación abrir/cerrar
+  // GACHA MODAL (HTML) + Animaci\u00F3n abrir/cerrar
   // =========================
   openGachaModal() {
     if (document.getElementById("gacha-modal")) return;
@@ -1872,11 +2020,11 @@ class EconomySystem {
           }
         </style>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <h2 style="margin:0;font-size:18px;">🎰 Gachapon</h2>
+          <h2 style="margin:0;font-size:18px;">\uD83C\uDFB0 Gachapon</h2>
           <button id="gachaClose" style="
             background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);
             padding:8px 10px;border-radius:10px;cursor:pointer;
-          ">✖</button>
+          ">\u2716</button>
         </div>
 
         <div class="gacha-grid" style="margin-top:12px; display:grid; grid-template-columns: 1.15fr .85fr; gap:12px;">
@@ -1885,7 +2033,7 @@ class EconomySystem {
             <!-- Permanente -->
             <div class="banner-block">
               <div class="banner-head">
-                <div class="banner-name">🌟 Banner Permanente</div>
+                <div class="banner-name">\uD83C\uDF1F Banner Permanente</div>
                 <span>Deseos: <b id="permCount">${this.wishesPermanent}</b></span>
               </div>
 
@@ -1898,7 +2046,7 @@ class EconomySystem {
               </div>
 
               <small style="opacity:.8; display:block;">
-                4★ asegurado cada 10 • 5★: 0.6%
+                4\u2605 asegurado cada 10 \u2022 5\u2605: 0.6%
               </small>
 
               <div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;">
@@ -1916,7 +2064,7 @@ class EconomySystem {
             <!-- Limitado -->
             <div class="banner-block">
               <div class="banner-head">
-                <div class="banner-name">⏳ Banner Limitado</div>
+                <div class="banner-name">\u23F3 Banner Limitado</div>
                 <span>Deseos: <b id="limCount">${this.wishesLimited}</b></span>
               </div>
 
@@ -1927,7 +2075,7 @@ class EconomySystem {
               </div>
 
               <div style="opacity:.85; font-size:13px;">
-                4★ asegurado cada 10 • 5★: 0.6%
+                4\u2605 asegurado cada 10 \u2022 5\u2605: 0.6%
               </div>
 
               <div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;">
@@ -1946,7 +2094,7 @@ class EconomySystem {
           <!-- Columna derecha: inventario -->
           <div style="border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <b>🎒 Inventario</b>
+              <b>\uD83C\uDF92 Inventario</b>
               <span style="opacity:.8; font-size:12px;">(Items para construir)</span>
             </div>
             <div id="invList" style="margin-top:10px; display:grid; gap:8px; max-height: 360px; overflow:auto;"></div>
@@ -2056,7 +2204,7 @@ class EconomySystem {
     if (perm) perm.textContent = String(this.wishesPermanent);
     if (lim) lim.textContent = String(this.wishesLimited);
 
-    // actualizar contadores de inventario si están
+    // actualizar contadores de inventario si est\u00E1n
     const invEls = modal.querySelectorAll("[data-inv]");
     invEls.forEach((el) => {
       const key = el.getAttribute("data-inv");
@@ -2064,10 +2212,10 @@ class EconomySystem {
       el.textContent = String(this.inventory[key] || 0);
     });
 
-    // re-render de lista (para que agregue items nuevos aunque no existían)
+    // re-render de lista (para que agregue items nuevos aunque no exist\u00EDan)
     this.renderInventoryIntoModal();
 
-    // también actualiza inventario standalone si está abierto
+    // tambi\u00E9n actualiza inventario standalone si est\u00E1 abierto
     const invModal = document.getElementById("inventory-modal");
     if (invModal) {
       const list = invModal.querySelector("#invList");

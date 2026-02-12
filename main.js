@@ -1,8 +1,10 @@
+﻿// =========================
+// MAPA (10 veces mas grande)
 // =========================
-// MAPA (10 veces más grande)
-// =========================
-const MAP_W = 140;
-const MAP_H = 140;
+const MAP_W = 700;
+const MAP_H = 700;
+const MAP_CENTER_R = Math.floor(MAP_H / 2);
+const MAP_CENTER_C = Math.floor(MAP_W / 2);
 
 const TILE_W = 64;
 const TILE_H = 32;
@@ -11,7 +13,7 @@ const TILE_H = 32;
 // BUILDING TYPES (WORLD)
 // =========================
 const BUILDING_TYPES = {
-  // ✅ verdes básicos (lo que ya tenías “de prueba”)
+  // [OK] verdes basicos (lo que ya tenias "de prueba")
   green_1: {
     key: "green_1",
     label: "Verde 1x1",
@@ -45,7 +47,7 @@ const BUILDING_TYPES = {
     reward: { exp: 4, gold: 40 },
     glow: false
   },
-  // ✅ VERDE 4x4 (4★)
+  // [OK] VERDE 4x4 (4*)
   green_4: {
     key: "green_4",
     label: "Verde 4x4",
@@ -57,7 +59,7 @@ const BUILDING_TYPES = {
     reward: { exp: 20, gold: 100 },
     glow: false
   },
-  // ✅ ROJOS (1★/2★/3★/4★)
+  // [OK] ROJOS (1*/2*/3*/4*)
   red_1: {
     key: "red_1",
     label: "Rojo 1x1",
@@ -91,7 +93,7 @@ const BUILDING_TYPES = {
     reward: { exp: 4, gold: 40 },
     glow: false
   },
-  // ✅ ROJO 4x4 (4★)
+  // [OK] ROJO 4x4 (4*)
   red_4: {
     key: "red_4",
     label: "Rojo 4x4",
@@ -103,7 +105,7 @@ const BUILDING_TYPES = {
     reward: { exp: 20, gold: 100 },
     glow: false
   },
-  // ✅ AZULES (1★/2★/3★/4★)
+  // [OK] AZULES (1*/2*/3*/4*)
   blue_1: {
     key: "blue_1",
     label: "Azul 1x1",
@@ -137,7 +139,7 @@ const BUILDING_TYPES = {
     reward: { exp: 4, gold: 40 },
     glow: false
   },
-  // ✅ AZUL 4x4 (4★)
+  // [OK] AZUL 4x4 (4*)
   blue_4: {
     key: "blue_4",
     label: "Azul 4x4",
@@ -150,7 +152,7 @@ const BUILDING_TYPES = {
     glow: false
   },
 
-  // ✅ VERDE 9x9 (5★ permanente)
+  // [OK] VERDE 9x9 (5* permanente)
   perm_green_9: {
     key: "perm_green_9",
     label: "Verde 9x9",
@@ -162,7 +164,7 @@ const BUILDING_TYPES = {
     reward: { exp: 10, gold: 150 },
     glow: false
   },
-  // ✅ AZUL 9x9 (5★ permanente)
+  // [OK] AZUL 9x9 (5* permanente)
   perm_blue_9: {
     key: "perm_blue_9",
     label: "Azul 9x9",
@@ -174,7 +176,7 @@ const BUILDING_TYPES = {
     reward: { exp: 10, gold: 150 },
     glow: false
   },
-  // ✅ ROJO 9x9 (5★ permanente)
+  // [OK] ROJO 9x9 (5* permanente)
   perm_red_9: {
     key: "perm_red_9",
     label: "Rojo 9x9",
@@ -187,16 +189,16 @@ const BUILDING_TYPES = {
     glow: false
   },
 
-  // ✅ DORADO 5★ (limitado) con brillo
+  // [OK] DORADO 5* (limitado) con brillo
   lim_gold_2: {
     key: "lim_gold_2",
     label: "Dorado 9x9",
     size: 9,
     fill: 0xfbbf24,
     border: 0xf59e0b,
-    buildSeconds: 60,      // rápida (base) -> 5★ lo reduce más
-    prodSeconds: 120,      // semi lenta (base) -> 5★ lo hace más lento
-    reward: { exp: 60, gold: 300 }, // muy alta (base) -> 5★ la triplica
+    buildSeconds: 60,      // rapida (base) -> 5* lo reduce mas
+    prodSeconds: 120,      // semi lenta (base) -> 5* lo hace mas lento
+    reward: { exp: 60, gold: 300 }, // muy alta (base) -> 5* la triplica
     glow: true
   }
 };
@@ -222,18 +224,20 @@ let mode = "cursor"; // inicia en cursor
 
 const DRAG_THRESHOLD = 10;
 
-// ✅ ZOOM LIMITS
-const ZOOM_MIN = 0.7;
-const ZOOM_MAX = 1.6;
-const ZOOM_STEP = 0.12; // rueda
+// [OK] ZOOM LIMITS
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2.2;
+const ZOOM_STEP = 0.1; // rueda
 
 // =========================
 // ISO helpers
 // =========================
 function isoToScreen(row, col) {
+  const r = row - MAP_CENTER_R;
+  const c = col - MAP_CENTER_C;
   return {
-    x: (col - row) * (TILE_W / 2),
-    y: (col + row) * (TILE_H / 2)
+    x: (c - r) * (TILE_W / 2),
+    y: (c + r) * (TILE_H / 2)
   };
 }
 
@@ -279,8 +283,8 @@ function isPointInDiamond(mx, my, cx, cy) {
 function screenToIsoTile(mx, my) {
   const a = mx / (TILE_W / 2); // c - r
   const b = my / (TILE_H / 2); // c + r
-  const cf = (a + b) / 2;
-  const rf = (b - a) / 2;
+  const cf = ((a + b) / 2) + MAP_CENTER_C;
+  const rf = ((b - a) / 2) + MAP_CENTER_R;
 
   const r0 = Math.floor(rf);
   const c0 = Math.floor(cf);
@@ -306,23 +310,28 @@ function screenToIsoTile(mx, my) {
 // Scene
 // =========================
 class MainScene extends Phaser.Scene {
+  preload() {
+    this.load.image("ui_gachapon_btn", "img/gachaponbutton.png");
+  }
+
   create() {
     
     // ===== CAMERAS =====
     // Main camera = WORLD (se zoom/pan)
     this.worldCam = this.cameras.main;
-    this.worldCam.setBackgroundColor("#0f172a");
+    this.worldCam.setBackgroundColor("rgba(0,0,0,0)");
 
     // UI camera = fijo (NO zoom)
     this.uiCam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
     this.uiCam.setScroll(0, 0);
     this.uiCam.setZoom(1);
 
-    // si cambia tamaño (FIT), ajusta UI cam
+    // si cambia tamano (FIT), ajusta UI cam
     this.scale.on("resize", (gameSize) => {
       const w = gameSize.width;
       const h = gameSize.height;
       this.uiCam.setSize(w, h);
+      this.clampWorldCamera();
     });
 
     this.input.mouse.disableContextMenu();
@@ -331,12 +340,15 @@ class MainScene extends Phaser.Scene {
     this.input.topOnly = true;
 
     // ===== Mundo =====
+    this.bgGridGfx = this.add.graphics();
     this.gridGfx = this.add.graphics();
     this.ghost = this.add.graphics();
     this.moveGhost = this.add.graphics();
+    this.bgGridGfx.setDepth(-5);
+    this.gridGfx.setDepth(-4);
 
     // por defecto, UI cam NO debe renderizar el mundo
-    this.uiCam.ignore([this.gridGfx, this.ghost, this.moveGhost]);
+    this.uiCam.ignore([this.bgGridGfx, this.gridGfx, this.ghost, this.moveGhost]);
 
     // ===== Estado input =====
     this.isDragging = false;
@@ -349,10 +361,10 @@ class MainScene extends Phaser.Scene {
     this.pending = null;
     this.selectedBuildingId = null;
     this.moveMode = null;
-    // ✅ item seleccionado para construir (por defecto el verde 1x1)
+    // [OK] item seleccionado para construir (por defecto el verde 1x1)
     this.selectedBuildKey = "green_1";
 
-    // lista de objetos UI para que el WORLD cam los ignore (así NO se mueven con zoom)
+    // lista de objetos UI para que el WORLD cam los ignore (asi NO se mueven con zoom)
     this.uiObjects = [];
     const regUI = (obj) => {
       this.uiObjects.push(obj);
@@ -382,18 +394,18 @@ class MainScene extends Phaser.Scene {
     this.createConfirmButtons(regUI);
     this.createActionButtons(regUI);
 
-    // ✅ IMPORTANTÍSIMO:
+    // [OK] IMPORTANTISIMO:
     // el WORLD cam ignora todos los UI -> el UI no se escala con zoom
     this.worldCam.ignore(this.uiObjects);
     this.economy = new EconomySystem(this);
 
-    // ===== Cámara / bounds =====
+    // ===== Camara / bounds =====
     this.setupCameraBounds();
 
-    // ✅ Zoom inicial
+    // [OK] Zoom inicial
     this.worldCam.setZoom(1);
 
-    // ✅ Controles de zoom (rueda + pinch)
+    // [OK] Controles de zoom (rueda + pinch)
     this.setupZoomControls();
 
     // Grid inicial (doble draw para que se vea al entrar)
@@ -411,6 +423,7 @@ class MainScene extends Phaser.Scene {
 
     // ===== Input =====
     this.input.on("pointerdown", (pointer) => {
+      if (this.hasBlockingDomOverlay()) return;
       if (pointer.y <= 140) return;
 
       this.isDragging = false;
@@ -423,6 +436,7 @@ class MainScene extends Phaser.Scene {
     });
 
     this.input.on("pointermove", (pointer) => {
+      if (this.hasBlockingDomOverlay()) return;
       if (pointer.y <= 140) return;
 
       // PAN: arrastre izquierdo siempre
@@ -438,6 +452,7 @@ class MainScene extends Phaser.Scene {
         if (this.isDragging) {
           this.worldCam.scrollX = this.pointerStart.camX - dx / this.worldCam.zoom;
           this.worldCam.scrollY = this.pointerStart.camY - dy / this.worldCam.zoom;
+          this.clampWorldCamera();
           return;
         }
       }
@@ -479,6 +494,7 @@ class MainScene extends Phaser.Scene {
         return;
       }
       if (this.overUI) return;
+      if (this.hasBlockingDomOverlay()) return;
 
       if (pointer.y <= 140) return;
       if (this.dragged) return;
@@ -510,7 +526,7 @@ class MainScene extends Phaser.Scene {
       const idOnTile = grid[tile.r][tile.c];
 
       if (idOnTile) {
-        // En modo construcciÃ³n no abrir info de edificios
+        // En modo construccion no abrir info de edificios
         if (mode === "build") return;
         this.openBuildingMenu(idOnTile, pointer);
         return;
@@ -545,19 +561,22 @@ class MainScene extends Phaser.Scene {
 
   update() {
     const cam = this.worldCam;
+    if ((document.getElementById("evo-modal") || document.getElementById("building-modal")) && mode === "build") {
+      this.setCursorMode();
+    }
 
-    // ✅ redraw también cuando cambia zoom
+    // [OK] redraw tambien cuando cambia zoom
     if (cam.scrollX !== this.lastCamX || cam.scrollY !== this.lastCamY || cam.zoom !== this.lastZoom) {
       this.lastCamX = cam.scrollX;
       this.lastCamY = cam.scrollY;
       this.lastZoom = cam.zoom;
       this.drawGridVisible();
     }
-    // ✅ FIX: actualizar ghost SIEMPRE en moveMode (aunque no haya pointermove)
+    // [OK] FIX: actualizar ghost SIEMPRE en moveMode (aunque no haya pointermove)
     if (this.moveMode) {
       const p = this.input.activePointer;
 
-      // si estás arriba del UI, oculta el ghost
+      // si estas arriba del UI, oculta el ghost
       if (p.y <= 140) {
         this.moveGhost.clear();
       } else {
@@ -569,7 +588,7 @@ class MainScene extends Phaser.Scene {
     if (this.pending) this.updateConfirmButtonsPosition();
     if (this.selectedBuildingId) this.updateActionButtonsPosition();
 
-    // ✅ AQUI:
+    // [OK] AQUI:
     this.updateBuildingsTimers();
   }
 
@@ -577,13 +596,16 @@ class MainScene extends Phaser.Scene {
   setupZoomControls() {
     // Wheel zoom (PC)
     this.input.on("wheel", (pointer, gameObjects, dx, dy) => {
-      // evita zoom cuando estás sobre UI alta
+      if (this.hasBlockingDomOverlay()) return;
+      // evita zoom cuando estas sobre UI alta
       if (pointer.y <= 140) return;
 
       const cam = this.worldCam;
 
-      // punto del mouse en mundo antes del zoom
-      const worldPointBefore = cam.getWorldPoint(pointer.x, pointer.y);
+      // zoom estable: usar centro de pantalla como ancla
+      const anchorX = cam.width * 0.5;
+      const anchorY = cam.height * 0.5;
+      const worldPointBefore = cam.getWorldPoint(anchorX, anchorY);
 
       let z = cam.zoom;
       if (dy > 0) z -= ZOOM_STEP; // scroll down = zoom out
@@ -594,10 +616,11 @@ class MainScene extends Phaser.Scene {
 
       cam.setZoom(z);
 
-      // mantener el punto bajo el mouse
-      const worldPointAfter = cam.getWorldPoint(pointer.x, pointer.y);
+      // mantener el centro del viewport en el mismo punto de mundo
+      const worldPointAfter = cam.getWorldPoint(anchorX, anchorY);
       cam.scrollX += (worldPointBefore.x - worldPointAfter.x);
       cam.scrollY += (worldPointBefore.y - worldPointAfter.y);
+      this.clampWorldCamera();
 
       // forzar refresh grid
       this.lastCamX = cam.scrollX;
@@ -643,6 +666,7 @@ class MainScene extends Phaser.Scene {
       const dx = p2.x - p1.x;
       const dy = p2.y - p1.y;
       const dist = Math.hypot(dx, dy);
+      if (this.pinch.startDist <= 0) return;
 
       const cam = this.worldCam;
 
@@ -656,6 +680,7 @@ class MainScene extends Phaser.Scene {
       const worldAfter = cam.getWorldPoint(this.pinch.midX, this.pinch.midY);
       cam.scrollX += (worldBefore.x - worldAfter.x);
       cam.scrollY += (worldBefore.y - worldAfter.y);
+      this.clampWorldCamera();
 
       // refresh
       this.lastCamX = cam.scrollX;
@@ -674,8 +699,21 @@ class MainScene extends Phaser.Scene {
   }
 
   // ================= UI helpers =================
+  hasBlockingDomOverlay() {
+    return Boolean(
+      document.getElementById("building-modal") ||
+      document.getElementById("evo-modal") ||
+      document.getElementById("gacha-modal") ||
+      document.getElementById("gacha-anim-overlay") ||
+      document.getElementById("inventory-modal") ||
+      document.getElementById("admin-modal")
+    );
+  }
+
   modeLabel() {
-    return mode === "build" ? "Modo: 🏗 Construcción" : "Modo: 🖱 Cursor";
+    return mode === "build"
+      ? "Modo: \u{1F3D7}\uFE0F Construccion"
+      : "Modo: \u{1F5B1}\uFE0F Cursor";
   }
 
   getBuildPreview() {
@@ -686,6 +724,10 @@ class MainScene extends Phaser.Scene {
   }
 
   setBuildMode() {
+    if (document.getElementById("evo-modal") || document.getElementById("building-modal")) {
+      this.setCursorMode();
+      return;
+    }
     mode = "build";
     this.modeText.setText(this.modeLabel());
     this.cancelBuildBtn.setVisible(true);
@@ -712,11 +754,11 @@ class MainScene extends Phaser.Scene {
 
 
   createCancelBuildButton(regUI) {
-    const style = { fontFamily: "Arial", fontSize: "14px", color: "#22c55e", backgroundColor: "#020617" };
+    const style = { fontFamily: "Arial", fontSize: "16px", color: "#22c55e", backgroundColor: "#020617" };
 
     this.cancelBuildBtn = regUI(
       this.add.text(280, 86, "Cancelar", style)
-        .setPadding(10, 6, 10, 6)
+        .setPadding(12, 8, 12, 8)
         .setInteractive({ useHandCursor: true })
         .setScrollFactor(0)
         .setVisible(false)
@@ -739,11 +781,11 @@ class MainScene extends Phaser.Scene {
   }
 
   createCancelSelectButton(regUI) {
-    const style = { fontFamily: "Arial", fontSize: "14px", color: "#f59e0b", backgroundColor: "#020617" };
+    const style = { fontFamily: "Arial", fontSize: "16px", color: "#f59e0b", backgroundColor: "#020617" };
 
     this.cancelSelectBtn = regUI(
       this.add.text(390, 86, "Cancelar", style)
-        .setPadding(10, 6, 10, 6)
+        .setPadding(12, 8, 12, 8)
         .setInteractive({ useHandCursor: true })
         .setScrollFactor(0)
         .setVisible(false)
@@ -766,14 +808,14 @@ class MainScene extends Phaser.Scene {
     });
   }
 
-  // ===== Confirm (✔ ✖) =====
+  // ===== Confirm (check / x) =====
   createConfirmButtons(regUI) {
-    const okStyle = { fontFamily: "Arial", fontSize: "18px", color: "#022c22", backgroundColor: "#22c55e" };
-    const xStyle  = { fontFamily: "Arial", fontSize: "18px", color: "#e5e7eb", backgroundColor: "#0f172a" };
+    const okStyle = { fontFamily: "Arial", fontSize: "14px", color: "#022c22", backgroundColor: "#22c55e" };
+    const xStyle  = { fontFamily: "Arial", fontSize: "14px", color: "#e5e7eb", backgroundColor: "#0f172a" };
 
     this.confirmOk = regUI(
-      this.add.text(0, 0, "✔", okStyle)
-        .setPadding(10, 6, 10, 6)
+      this.add.text(0, 0, "\u2714", okStyle)
+        .setPadding(8, 5, 8, 5)
         .setScrollFactor(0)
         .setInteractive({ useHandCursor: true })
         .setVisible(false)
@@ -781,8 +823,8 @@ class MainScene extends Phaser.Scene {
     );
 
     this.confirmX = regUI(
-      this.add.text(0, 0, "✖", xStyle)
-        .setPadding(10, 6, 10, 6)
+      this.add.text(0, 0, "\u2716", xStyle)
+        .setPadding(8, 5, 8, 5)
         .setScrollFactor(0)
         .setInteractive({ useHandCursor: true })
         .setVisible(false)
@@ -825,14 +867,16 @@ class MainScene extends Phaser.Scene {
     
     
 
-    // ✅ convertir a pantalla considerando zoom
+    // [OK] convertir a pantalla considerando zoom
     
     const x = this.pending.clickX;
     const y = this.pending.clickY;
 
     const oy = 18;
-    this.confirmOk.setPosition(x - 30, y + oy);
-    this.confirmX.setPosition(x + 10, y + oy);
+    const gap = 12;
+    const okW = this.confirmOk.width;
+    this.confirmOk.setPosition(x - okW - (gap * 0.5), y + oy);
+    this.confirmX.setPosition(x + (gap * 0.5), y + oy);
   }
 
   clearPending() {
@@ -859,26 +903,26 @@ class MainScene extends Phaser.Scene {
     this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.35, ok ? okBorder : badColor);
   }
 
-  // ===== Action buttons (⟲ ✋ 🗑 ✖) =====
+  // ===== Action buttons =====
   createActionButtons(regUI) {
-    const baseStyle   = { fontFamily: "Arial", fontSize: "18px", color: "#e5e7eb", backgroundColor: "#020617" };
-    const dangerStyle = { fontFamily: "Arial", fontSize: "18px", color: "#f87171", backgroundColor: "#020617" };
+    const baseStyle   = { fontFamily: "Arial", fontSize: "21px", color: "#e5e7eb", backgroundColor: "#020617" };
+    const dangerStyle = { fontFamily: "Arial", fontSize: "21px", color: "#f87171", backgroundColor: "#020617" };
 
     this.actRotate = regUI(
-      this.add.text(0, 0, "⟲", baseStyle)
-        .setPadding(10, 6, 10, 6).setScrollFactor(0)
+      this.add.text(0, 0, "\u27F2", baseStyle)
+        .setPadding(12, 8, 12, 8).setScrollFactor(0)
         .setInteractive({ useHandCursor: true }).setVisible(false).setDepth(9999)
     );
 
     this.actMove = regUI(
-      this.add.text(0, 0, "✋", baseStyle)
-        .setPadding(10, 6, 10, 6).setScrollFactor(0)
+      this.add.text(0, 0, "\u270B", baseStyle)
+        .setPadding(12, 8, 12, 8).setScrollFactor(0)
         .setInteractive({ useHandCursor: true }).setVisible(false).setDepth(9999)
     );
 
     this.actTrash = regUI(
-      this.add.text(0, 0, "🗑", dangerStyle)
-        .setPadding(10, 6, 10, 6).setScrollFactor(0)
+      this.add.text(0, 0, "\u{1F5D1}", dangerStyle)
+        .setPadding(12, 8, 12, 8).setScrollFactor(0)
         .setInteractive({ useHandCursor: true }).setVisible(false).setDepth(9999)
     );
 
@@ -919,7 +963,7 @@ class MainScene extends Phaser.Scene {
   
     
 
-    // ✅ convertir a pantalla considerando zoom
+    // [OK] convertir a pantalla considerando zoom
     const x = this.actionClickX ?? 0;
     const y = this.actionClickY ?? 0;
     
@@ -1034,8 +1078,201 @@ class MainScene extends Phaser.Scene {
     }
   }
 
+  ensureTranscendAnimStyles() {
+    if (document.getElementById("transcend-anim-styles")) return;
+    const style = document.createElement("style");
+    style.id = "transcend-anim-styles";
+    style.textContent = `
+      .transcend-anim {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(circle at 50% 45%, rgba(255,255,255,.35), rgba(255,255,255,0) 62%),
+          radial-gradient(circle at 20% 20%, rgba(168,85,247,.25), rgba(168,85,247,0) 55%),
+          radial-gradient(circle at 80% 30%, rgba(34,197,94,.25), rgba(34,197,94,0) 55%);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      .transcend-anim::before {
+        content:"";
+        position:absolute;
+        inset:-10%;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.22), rgba(255,255,255,0) 70%);
+        opacity:.6;
+      }
+      .transcend-anim.on { animation: transFade 2.0s ease forwards; }
+      .transcend-stage { position: relative; width: 260px; height: 320px; }
+      .transcend-streak {
+        position: absolute;
+        left: -30%;
+        width: 160px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--accent, #f59e0b), transparent);
+        opacity: .9;
+        animation: none;
+        animation-delay: var(--d, 0s);
+      }
+      .transcend-env {
+        position: absolute;
+        left: 50%;
+        bottom: 20px;
+        width: 220px;
+        height: 130px;
+        transform: translateX(-50%) translateY(30px);
+        border-radius: 14px;
+        background: linear-gradient(160deg, #1f2937, #0b1222);
+        border: 1px solid rgba(255,255,255,.12);
+        box-shadow: 0 16px 30px rgba(0,0,0,.45);
+        animation: none;
+      }
+      .transcend-card {
+        position: absolute;
+        left: 50%;
+        bottom: 34px;
+        width: 150px;
+        height: 210px;
+        transform: translate(-50%, 80px) scale(.88) rotate(-6deg);
+        border-radius: 16px;
+        background: linear-gradient(180deg, #0f172a, #0b1222);
+        border: 2px solid var(--accent, #f59e0b);
+        box-shadow: 0 18px 32px rgba(0,0,0,.45), 0 0 18px rgba(245,158,11,.35);
+        animation: none;
+        overflow: hidden;
+      }
+      .transcend-card::after {
+        content:"";
+        position:absolute;
+        inset:-40%;
+        background: linear-gradient(120deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.7) 52%, rgba(255,255,255,0) 64%);
+        opacity:.7;
+        transform: translateX(-30%) rotate(8deg);
+        animation: none;
+      }
+      .transcend-icon {
+        margin-top: 18px;
+        font-size: 28px;
+        text-align: center;
+      }
+      .transcend-name {
+        margin-top: 6px;
+        text-align: center;
+        font-weight: 800;
+        letter-spacing: .5px;
+      }
+      .transcend-stars {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        margin-top: 8px;
+        font-size: 18px;
+      }
+      .transcend-stars .star {
+        display: inline-block;
+        background: conic-gradient(from var(--h), #22c55e, #38bdf8, #a855f7, #f59e0b, #ef4444, #22c55e);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 8px rgba(255,255,255,.35);
+      }
+      .transcend-flash {
+        position: absolute;
+        inset: -30%;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.8), rgba(255,255,255,0) 60%);
+        opacity: 0;
+        animation: none;
+      }
+      .transcend-anim.on .transcend-streak { animation: transStreak 1.2s ease forwards; }
+      .transcend-anim.on .transcend-env { animation: transEnv 1.3s ease forwards; }
+      .transcend-anim.on .transcend-card { animation: transCard 1.45s ease forwards; }
+      .transcend-anim.on .transcend-card::after { animation: transSheen 1.2s ease forwards; }
+      .transcend-anim.on .transcend-flash { animation: transFlash 1.1s ease forwards; }
+      @keyframes transFade {
+        0% { opacity: 0; }
+        10% { opacity: 1; }
+        80% { opacity: .98; }
+        100% { opacity: 0; }
+      }
+      @keyframes transStreak {
+        0% { transform: translateX(0) translateY(0); opacity: 0; }
+        30% { opacity: .9; }
+        100% { transform: translateX(140%) translateY(-40px); opacity: 0; }
+      }
+      @keyframes transEnv {
+        0% { transform: translateX(-50%) translateY(30px); opacity: .4; }
+        100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+      }
+      @keyframes transCard {
+        0% { transform: translate(-50%, 80px) scale(.88) rotate(-6deg); opacity: .2; }
+        60% { transform: translate(-50%, -10px) scale(1) rotate(2deg); opacity: 1; }
+        100% { transform: translate(-50%, -18px) scale(1.02) rotate(0deg); opacity: 1; }
+      }
+      @keyframes transSheen {
+        0% { opacity: 0; transform: translateX(-30%) rotate(8deg); }
+        40% { opacity: .9; }
+        100% { opacity: 0; transform: translateX(30%) rotate(8deg); }
+      }
+      @keyframes transFlash {
+        0% { opacity: 0; }
+        35% { opacity: .9; }
+        100% { opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  playTranscendAnimation(targetEl, def) {
+    if (!targetEl) return;
+    this.ensureTranscendAnimStyles();
+    const container = targetEl.closest?.(".evo-window") || targetEl.closest?.(".building-window") || targetEl;
+    if (container && getComputedStyle(container).position === "static") {
+      container.style.position = "relative";
+    }
+    if (container && !container.style.overflow) {
+      container.style.overflow = "hidden";
+    }
+    const icon = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[def?.key]?.icon)
+      ? ITEM_DEFS[def.key].icon
+      : "\u2726";
+    const name = def?.label || def?.key || "Transcender";
+    const accent = this.colorToHex(def?.border ?? 0xf59e0b);
+    const stars = Array.from({ length: 6 }, (_, i) => (
+      `<span class="star" style="--h:${i * 60}deg">\u2605</span>`
+    )).join("");
+    const overlay = document.createElement("div");
+    overlay.className = "transcend-anim";
+    overlay.style.setProperty("--accent", accent);
+    overlay.style.position = "absolute";
+    overlay.style.inset = "0";
+    overlay.style.zIndex = "100";
+    overlay.innerHTML = `
+      <div class="transcend-stage">
+        ${Array.from({ length: 6 }, (_, i) => (
+          `<span class="transcend-streak" style="top:${20 + i * 18}px; --d:${i * 0.06}s;"></span>`
+        )).join("")}
+        <div class="transcend-env"></div>
+        <div class="transcend-card">
+          <div class="transcend-icon">${icon}</div>
+          <div class="transcend-name">${name}</div>
+          <div class="transcend-stars">${stars}</div>
+        </div>
+        <div class="transcend-flash"></div>
+      </div>
+    `;
+    const prev = container?.querySelector?.(".transcend-anim");
+    if (prev) prev.remove();
+    (container || document.body).appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add("on"));
+    setTimeout(() => overlay.remove(), 2100);
+  }
+
   transcendBuilding(b, def) {
     if (!b) return;
+    this.setCursorMode();
     b.evoStage = 6;
     b.evoLevel = 0;
     this.applyEvolution(b, Date.now());
@@ -1045,6 +1282,7 @@ class MainScene extends Phaser.Scene {
   openEvolutionModal(b) {
     if (!b || !this.economy) return;
     if (!b.isBuilt) return;
+    this.setCursorMode();
     const existing = document.getElementById("evo-modal");
     if (existing) existing.remove();
 
@@ -1055,6 +1293,9 @@ class MainScene extends Phaser.Scene {
     const targetColor = this.getColorForKey(b.typeKey);
     const fillHex = this.colorToHex(def.fill);
     const borderHex = this.colorToHex(def.border);
+    const itemIcon = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[b.typeKey]?.icon)
+      ? ITEM_DEFS[b.typeKey].icon
+      : "\u2726";
     const previewSvg = `
       <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
         <polygon points="60,8 112,40 60,72 8,40" fill="${fillHex}" stroke="${borderHex}" stroke-width="3"/>
@@ -1085,15 +1326,15 @@ class MainScene extends Phaser.Scene {
 
     const list = candidates.length
       ? candidates.map((key) => {
-          const item = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[key]) ? ITEM_DEFS[key] : { name: key, size: targetSize, rarity: targetRarity, icon: "❖" };
+          const item = (typeof ITEM_DEFS !== "undefined" && ITEM_DEFS[key]) ? ITEM_DEFS[key] : { name: key, size: targetSize, rarity: targetRarity, icon: "\u2726" };
           const count = this.economy.inventory[key] || 0;
           return `
             <button class="evo-item" data-key="${key}">
               <span class="evo-item-left">
-                <span class="evo-item-ico">${item.icon || "❖"}</span>
+                <span class="evo-item-ico">${item.icon || "\u2726"}</span>
                 <span>
                   <div class="evo-item-name">${item.name || key}</div>
-                  <div class="evo-item-meta">${item.size}x${item.size} • ${item.rarity}★</div>
+                  <div class="evo-item-meta">${item.size}x${item.size}  |  ${item.rarity}\u2605</div>
                 </span>
               </span>
               <b class="evo-item-count">x${count}</b>
@@ -1122,9 +1363,9 @@ class MainScene extends Phaser.Scene {
       `;
     }).join("");
     const evoTransStars = Array.from({ length: 6 }, (_, i) => (
-      `<span class="star" style="--h:${i * 60}deg">★</span>`
+      `<span class="star" style="--h:${i * 60}deg">\u2605</span>`
     )).join("");
-    const evoStarsHtml = (displayRarity === 6) ? evoTransStars : "★".repeat(displayRarity);
+    const evoStarsHtml = (displayRarity === 6) ? evoTransStars : "\u2605".repeat(displayRarity);
 
     modal.innerHTML = `
       <div class="evo-window">
@@ -1171,6 +1412,21 @@ class MainScene extends Phaser.Scene {
             display: grid;
             gap: 8px;
             align-content: start;
+            position: relative;
+          }
+          #evo-modal .evo-target-icon {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #111827;
+            border: 1px solid rgba(255,255,255,.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 14px rgba(0,0,0,.35);
           }
           #evo-modal .evo-main-card {
             position: relative;
@@ -1320,7 +1576,7 @@ class MainScene extends Phaser.Scene {
             border: 2px solid rgba(255,255,255,.45);
             box-shadow: 0 0 20px rgba(255,255,255,.25);
             opacity: .8;
-            animation: evoRingSpin 1.6s ease forwards;
+            animation: none;
           }
           #evo-modal .evo-trans-envelope {
             position: absolute;
@@ -1332,7 +1588,7 @@ class MainScene extends Phaser.Scene {
             border-radius: 14px;
             background: linear-gradient(160deg, #1f2937, #0b1222);
             box-shadow: 0 16px 30px rgba(0,0,0,.45);
-            animation: evoEnvUp 1.2s ease forwards;
+            animation: none;
           }
           #evo-modal .evo-trans-envelope::before {
             content:"";
@@ -1352,7 +1608,7 @@ class MainScene extends Phaser.Scene {
             background: linear-gradient(180deg, #0f172a, #0b1222);
             border: 2px solid var(--fx-accent, #f59e0b);
             box-shadow: 0 18px 32px rgba(0,0,0,.45), 0 0 18px rgba(245,158,11,.35);
-            animation: evoCardRise 1.3s ease forwards;
+            animation: none;
             overflow: hidden;
           }
           #evo-modal .evo-trans-card::after {
@@ -1362,7 +1618,7 @@ class MainScene extends Phaser.Scene {
             background: linear-gradient(120deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.7) 52%, rgba(255,255,255,0) 64%);
             opacity: .7;
             transform: translateX(-30%) rotate(8deg);
-            animation: evoCardSheen 1.2s ease forwards;
+            animation: none;
           }
           #evo-modal .evo-trans-sigil {
             margin-top: 18px;
@@ -1402,12 +1658,41 @@ class MainScene extends Phaser.Scene {
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 8px rgba(255,255,255,.35);
           }
+          #evo-modal .evo-spark-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 6;
+          }
+          #evo-modal .evo-spark {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,0) 70%);
+            box-shadow: 0 0 10px rgba(251,191,36,.8), 0 0 18px rgba(245,158,11,.6);
+          }
           #evo-modal .evo-trans-flash {
             position: absolute;
             inset: -30%;
             background:
               radial-gradient(circle at 50% 50%, rgba(255,255,255,.8), rgba(255,255,255,0) 60%);
             opacity: 0;
+            animation: none;
+          }
+          #evo-modal .evo-trans-fx.on .evo-trans-ring {
+            animation: evoRingSpin 1.6s ease forwards;
+          }
+          #evo-modal .evo-trans-fx.on .evo-trans-envelope {
+            animation: evoEnvUp 1.2s ease forwards;
+          }
+          #evo-modal .evo-trans-fx.on .evo-trans-card {
+            animation: evoCardRise 1.3s ease forwards;
+          }
+          #evo-modal .evo-trans-fx.on .evo-trans-card::after {
+            animation: evoCardSheen 1.2s ease forwards;
+          }
+          #evo-modal .evo-trans-fx.on .evo-trans-flash {
             animation: evoFlash 1.1s ease forwards;
           }
           @keyframes evoPulse {
@@ -1459,27 +1744,17 @@ class MainScene extends Phaser.Scene {
             #evo-modal .evo-grid { grid-template-columns: 1fr; }
           }
         </style>
-        <div id="evoTransFx" class="evo-trans-fx" style="--fx-accent:${borderHex};">
-          <div class="evo-trans-stage">
-            <div class="evo-trans-ring"></div>
-            <div class="evo-trans-envelope"></div>
-            <div class="evo-trans-card">
-              <div class="evo-trans-sigil">✦</div>
-              <div class="evo-trans-title">Transcender</div>
-              <div class="evo-trans-stars">${evoTransStars}</div>
-            </div>
-            <div class="evo-trans-flash"></div>
-          </div>
-        </div>
+        <div id="evoSparkLayer" class="evo-spark-layer"></div>
         <div class="evo-header">
           <b>Fusionar (${def.label || b.typeKey})</b>
-          <button id="evoClose" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:10px;cursor:pointer;">✖</button>
+          <button id="evoClose" style="background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:10px;cursor:pointer;">\u2716</button>
         </div>
         <div class="evo-grid">
           <div class="evo-list">
             ${list}
           </div>
           <div class="evo-main">
+            <div id="evoTargetIcon" class="evo-target-icon">${itemIcon}</div>
             <div id="evoMainCard" class="evo-main-card">
               <div id="evoFrame" class="${frameClass}">
                 <div id="evoInner" class="preview-inner${chromeClass}">
@@ -1489,7 +1764,7 @@ class MainScene extends Phaser.Scene {
             </div>
             <div class="evo-title">${def.label || b.typeKey}</div>
           <div id="evoStars" class="evo-stars">${evoStarsHtml}</div>
-            <small id="evoLevelText" style="opacity:.75;">Evolucion ${stageLabel}★: ${evoLevel}/5 (+${(evoStage >= 6) ? (5 + evoLevel) : evoLevel}%)</small>
+            <small id="evoLevelText" style="opacity:.75;">Evolucion ${stageLabel}\u2605: ${evoLevel}/5 (+${(evoStage >= 6) ? (5 + evoLevel) : evoLevel}%)</small>
           </div>
         </div>
         <div id="evoSlots" class="evo-slots">
@@ -1529,13 +1804,39 @@ class MainScene extends Phaser.Scene {
     const evoInner = modal.querySelector("#evoInner");
     const evoApply = modal.querySelector("#evoApply");
     const evoTrans = modal.querySelector("#evoTrans");
-    const evoFx = modal.querySelector("#evoTransFx");
+    const evoSparkLayer = modal.querySelector("#evoSparkLayer");
+    const evoWindow = modal.querySelector(".evo-window");
+    const evoSparkTarget = modal.querySelector("#evoTargetIcon");
 
-    const triggerEvoFx = () => {
-      if (!evoFx) return;
-      evoFx.classList.remove("on");
-      void evoFx.offsetWidth;
-      evoFx.classList.add("on");
+    const playEvoSparks = (pendingSlots) => {
+      if (!evoSparkLayer || !evoWindow || !evoSparkTarget) return;
+      const winRect = evoWindow.getBoundingClientRect();
+      const targetRect = evoSparkTarget.getBoundingClientRect();
+      const tx = targetRect.left + targetRect.width / 2 - winRect.left;
+      const ty = targetRect.top + targetRect.height / 2 - winRect.top;
+
+      pendingSlots.forEach((slot, i) => {
+        const r = slot.getBoundingClientRect();
+        const sx = r.left + r.width / 2 - winRect.left;
+        const sy = r.top + r.height / 2 - winRect.top;
+        const spark = document.createElement("div");
+        spark.className = "evo-spark";
+        spark.style.left = `${sx - 4}px`;
+        spark.style.top = `${sy - 4}px`;
+        evoSparkLayer.appendChild(spark);
+        const dx = tx - sx;
+        const dy = ty - sy;
+        const delay = i * 60;
+        const anim = spark.animate([
+          { transform: "translate(0,0) scale(1)", opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0 }
+        ], {
+          duration: 450,
+          delay,
+          easing: "cubic-bezier(.2,.8,.2,1)"
+        });
+        anim.onfinish = () => spark.remove();
+      });
     };
 
     const pendingUsed = {};
@@ -1573,7 +1874,7 @@ class MainScene extends Phaser.Scene {
       const level = getLevel();
       const stage = getStage();
       const total = (stage >= 6) ? (5 + level) : level;
-      if (evoLevelText) evoLevelText.textContent = `Evolucion ${stage >= 5 ? stage : targetRarity}★: ${level}/5 (+${total}%)`;
+      if (evoLevelText) evoLevelText.textContent = `Evolucion ${stage >= 5 ? stage : targetRarity}\u2605: ${level}/5 (+${total}%)`;
 
       const display = (targetRarity === 5 && stage >= 6) ? 6 : targetRarity;
       const evoActive = (level > 0) || (stage >= 6);
@@ -1581,7 +1882,7 @@ class MainScene extends Phaser.Scene {
         if (display === 6) {
           evoStars.innerHTML = evoTransStars;
         } else {
-          evoStars.textContent = "★".repeat(display);
+          evoStars.textContent = "\u2605".repeat(display);
         }
       }
       const frameCls = display === 6
@@ -1644,7 +1945,7 @@ class MainScene extends Phaser.Scene {
       slot.dataset.key = key;
       slot.classList.add("filled", "pending", "pop");
       const ico = slot.querySelector(".evo-slot-ico");
-      if (ico) ico.textContent = icon || "❖";
+      if (ico) ico.textContent = icon || "\u2726";
       setTimeout(() => slot.classList.remove("pop"), 350);
       pendingUsed[key] = used + 1;
       updateListCounts();
@@ -1687,7 +1988,7 @@ class MainScene extends Phaser.Scene {
       btn.addEventListener("click", () => {
         const key = btn.getAttribute("data-key");
         if (!key) return;
-        const icon = btn.querySelector(".evo-item-ico")?.textContent || "❖";
+        const icon = btn.querySelector(".evo-item-ico")?.textContent || "\u2726";
         addPending(key, icon);
       });
     });
@@ -1719,17 +2020,23 @@ class MainScene extends Phaser.Scene {
           }
         }
 
+        const newLevel = Math.min(5, levelNow + pending);
         if (stageNow === 5) {
           b.evoStage = 5;
-          b.evoLevel = Math.min(5, levelNow + pending);
+          b.evoLevel = newLevel;
         } else {
           b.evoStage = stageNow;
-          b.evoLevel = Math.min(5, levelNow + pending);
+          b.evoLevel = newLevel;
         }
 
         this.applyEvolution(b, Date.now());
         this.updateBuildingInfoModal(b, def, Date.now());
         this.openBuildingInfoModal(b.id);
+
+        if (newLevel < 5) {
+          const pendingSlots = slots.filter((s) => s.dataset.pending === "1");
+          playEvoSparks(pendingSlots);
+        }
 
         if (evoMainCard) {
           evoMainCard.classList.remove("evo-animate");
@@ -1752,7 +2059,7 @@ class MainScene extends Phaser.Scene {
         if (!(stageNow === 5 && levelNow >= 5)) return;
 
         this.transcendBuilding(b, def);
-        triggerEvoFx();
+        if (evoWindow) this.playTranscendAnimation(evoWindow, def);
         this.openBuildingInfoModal(b.id);
 
         if (evoMainCard) {
@@ -1795,6 +2102,7 @@ class MainScene extends Phaser.Scene {
 
     const b = buildings.get(id);
     if (!b) return;
+    this.setCursorMode();
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     const baseRarity = this.getRarityForKey(def.key || b.typeKey);
@@ -1804,9 +2112,9 @@ class MainScene extends Phaser.Scene {
       : (baseRarity === 5 ? 5 : 0);
     const displayRarity = (baseRarity === 5 && evoStage >= 6) ? 6 : baseRarity;
     const evoActive = (evoLevel > 0) || (evoStage >= 6);
-    const stars = "★".repeat(displayRarity);
+    const stars = "\u2605".repeat(displayRarity);
     const starsHtml = (displayRarity === 6)
-      ? Array.from({ length: 6 }, (_, i) => `<span class="star star-6" style="--h:${i * 60}deg">★</span>`).join("")
+      ? Array.from({ length: 6 }, (_, i) => `<span class="star star-6" style="--h:${i * 60}deg">\u2605</span>`).join("")
       : stars;
     const starClass = (displayRarity === 6) ? "stars-6" : (displayRarity === 5 ? "stars-5" : "stars-base");
     const frameClass = displayRarity === 6
@@ -2011,11 +2319,11 @@ class MainScene extends Phaser.Scene {
         transition: transform .18s ease, opacity .18s ease;
       ">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <h2 style="margin:0;font-size:18px;">🏠 ${displayLabel}</h2>
+          <h2 style="margin:0;font-size:18px;">\u{1F3E0} ${displayLabel}</h2>
           <button id="buildingClose" style="
             background:#111827;color:#e5e7eb;border:1px solid rgba(255,255,255,.12);
             padding:8px 10px;border-radius:10px;cursor:pointer;
-          ">✖</button>
+          ">\u2716</button>
         </div>
 
         <div style="margin-top:10px; display:grid; gap:8px; font-size:14px;">
@@ -2027,18 +2335,18 @@ class MainScene extends Phaser.Scene {
             </div>
             <div style="display:grid; gap:6px;">
           <div>Rareza: <b id="previewStars" class="preview-stars ${starClass}">${starsHtml}</b></div>
-              <div>Tamaño: <b>${b.size}x${b.size}</b></div>
+              <div>Tamano: <b>${b.size}x${b.size}</b></div>
             </div>
           </div>
-          <div>Construcción: <b>${buildLabel}</b></div>
-          <div>Producción: <b>${prodLabel}</b></div>
-          <div>Recompensa: <b>+${rewardGold} Oro</b> · <b>+${rewardExp} EXP</b></div>
+          <div>Construccion: <b>${buildLabel}</b></div>
+          <div>Produccion: <b>${prodLabel}</b></div>
+          <div>Recompensa: <b>+${rewardGold} Oro</b>  |  <b>+${rewardExp} EXP</b></div>
         </div>
 
         <div id="buildSection" style="margin-top:12px;">
           <div style="display:flex; justify-content:space-between; font-size:13px; opacity:.85;">
-            <span>Construcción</span>
-            <span id="buildTime">—</span>
+            <span>Construccion</span>
+            <span id="buildTime">-</span>
           </div>
           <div style="margin-top:6px; height:10px; background:#1e293b; border-radius:999px; overflow:hidden;">
             <div id="buildFill" style="height:100%; width:0%; background:#fbbf24;"></div>
@@ -2047,8 +2355,8 @@ class MainScene extends Phaser.Scene {
 
         <div id="prodSection" style="margin-top:12px;">
           <div style="display:flex; justify-content:space-between; font-size:13px; opacity:.85;">
-            <span>Producción</span>
-            <span id="prodTime">—</span>
+            <span>Produccion</span>
+            <span id="prodTime">-</span>
           </div>
           <div style="margin-top:6px; height:10px; background:#1e293b; border-radius:999px; overflow:hidden;">
             <div id="prodFill" style="height:100%; width:0%; background:#22c55e;"></div>
@@ -2079,7 +2387,7 @@ class MainScene extends Phaser.Scene {
         <div style="margin-top:12px; display:grid; gap:8px; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px;">
           <div class="evo-row">
             <div id="evoDiamonds">${this.buildEvoDiamonds(b.evoLevel || 0)}</div>
-            <small id="evoHint" style="opacity:.8;">Evolución: ${b.evoLevel || 0}/5 (+${b.evoLevel || 0}%)</small>
+            <small id="evoHint" style="opacity:.8;">Evolucion: ${b.evoLevel || 0}/5 (+${b.evoLevel || 0}%)</small>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button id="bldEvolve" style="
@@ -2095,7 +2403,7 @@ class MainScene extends Phaser.Scene {
         </div>
 
         <small style="opacity:.75; display:block; margin-top:10px;">
-          Toca 💰 / ⭐ sobre el edificio para recolectar.
+          Toca \u{1F4B0} / \u2B50 sobre el edificio para recolectar.
         </small>
       </div>
     `;
@@ -2170,6 +2478,8 @@ class MainScene extends Phaser.Scene {
       if (baseRarity !== 5) return;
       if (b.evoStage === 5 && (b.evoLevel || 0) >= 5) {
         this.transcendBuilding(b, def);
+        const win = modal.querySelector(".building-window");
+        if (win) this.playTranscendAnimation(win, def);
       }
     };
 
@@ -2264,32 +2574,32 @@ class MainScene extends Phaser.Scene {
     if (previewStars) {
       if (displayRarity === 6) {
         previewStars.innerHTML = Array.from({ length: 6 }, (_, i) => (
-          `<span class="star star-6" style="--h:${i * 60}deg">★</span>`
+          `<span class="star star-6" style="--h:${i * 60}deg">\u2605</span>`
         )).join("");
       } else {
-        previewStars.textContent = "★".repeat(displayRarity);
+        previewStars.textContent = "\u2605".repeat(displayRarity);
       }
       const starsCls = `preview-stars ${starClass}`;
       if (previewStars.className !== starsCls) previewStars.className = starsCls;
     }
     if (previewFrame && previewFrame.className !== frameClass) previewFrame.className = frameClass;
     if (previewInner && previewInner.className !== chromeClass) previewInner.className = chromeClass;
+    const evoLevelClamped = Math.max(0, Math.min(5, b.evoLevel || 0));
     if (win) {
       const winCls = `building-window win-${displayRarity}${evoActive ? " evo-on" : ""}${(displayRarity === 6 && evoLevelClamped >= 5) ? " win-6max" : ""}`;
       if (win.className !== winCls) win.className = winCls;
     }
 
-    const evoLevelClamped = Math.max(0, Math.min(5, b.evoLevel || 0));
     const totalEvo = (evoStage >= 6) ? (5 + evoLevelClamped) : evoLevelClamped;
     if (evoDiamonds) evoDiamonds.innerHTML = this.buildEvoDiamonds(evoLevelClamped);
-    if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}★: ${evoLevelClamped}/5 (+${totalEvo}%)`;
+    if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}\u2605: ${evoLevelClamped}/5 (+${totalEvo}%)`;
     if (evoBtn) {
       if (!b.isBuilt) {
         evoBtn.setAttribute("disabled", "true");
-        evoBtn.textContent = "En construcción";
+        evoBtn.textContent = "En construccion";
       } else if (baseRarity < 5) {
         evoBtn.setAttribute("disabled", "true");
-        evoBtn.textContent = "Solo 5★";
+        evoBtn.textContent = "Solo 5\u2605";
       } else if (evoStage >= 6 && evoLevelClamped >= 5) {
         evoBtn.setAttribute("disabled", "true");
         evoBtn.textContent = "Max";
@@ -2349,7 +2659,7 @@ class MainScene extends Phaser.Scene {
     };
 
     this.selectedBuildingId = null;
-    this.modeText.setText("Modo: ✋ Moviendo (naranja=OK / rojo=NO) | Click suelta / Click fuera cancela");
+    this.modeText.setText("Modo: Moviendo (naranja=OK / rojo=NO) | Click suelta / Click fuera cancela");
     this.moveGhost.clear();
   }
 
@@ -2422,7 +2732,7 @@ class MainScene extends Phaser.Scene {
     const b = buildings.get(id);
     if (!b) return;
 
-    // ✅ devolver item al inventario (si no es el verde base)
+    // [OK] devolver item al inventario (si no es el verde base)
     if (this.economy && b.typeKey && b.typeKey !== "green_1") {
       this.economy.addItem?.(b.typeKey, 1);
     }
@@ -2458,7 +2768,7 @@ class MainScene extends Phaser.Scene {
   }
 
   placeBuilding(r0, c0) {
-    // 👇 construir usando el item seleccionado
+    // construir usando el item seleccionado
     const typeKey = this.selectedBuildKey || "green_1";
     const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
 
@@ -2478,8 +2788,8 @@ class MainScene extends Phaser.Scene {
     // validar espacio
     if (!canPlace(size, r0, c0)) return;
 
-    // ✅ si no es el verde básico, debe existir en inventario y se consume
-    // (si quieres que verde también consuma, lo cambiamos luego)
+    // [OK] si no es el verde basico, debe existir en inventario y se consume
+    // (si quieres que verde tambien consuma, lo cambiamos luego)
     if (this.economy && typeKey !== "green_1") {
       const ok = this.economy.consumeItem(typeKey, 1);
       if (!ok) {
@@ -2498,36 +2808,38 @@ class MainScene extends Phaser.Scene {
     const ghostBorder = isInstant ? def.border : 0x64748b;
     this.drawCells(gfx, cells, def.fill, ghostAlpha, ghostBorder);
 
-    // ✅ UI cam NO renderiza edificios
+    // [OK] UI cam NO renderiza edificios
     this.uiCam.ignore(gfx);
 
     // ===== barras en mundo =====
     const buildBar = this.add.graphics();
     const prodBar = this.add.graphics();
+    buildBar.setDepth(80);
+    prodBar.setDepth(80);
     this.uiCam.ignore([buildBar, prodBar]);
 
     // ===== iconos de recompensa (manual) =====
-    const rewardGoldIcon = this.add.text(0, 0, "💰", {
+    const rewardGoldIcon = this.add.text(0, 0, "\u{1F4B0}", {
       fontFamily: "Arial",
-      fontSize: "22px",
+      fontSize: "28px",
       color: "#fbbf24",
       backgroundColor: "#0b1222"
     })
       .setOrigin(0.5, 0.5)
-      .setPadding(6, 4, 6, 4)
-      .setDepth(60)
+      .setPadding(10, 6, 10, 6)
+      .setDepth(82)
       .setVisible(false)
       .setInteractive({ useHandCursor: true });
 
-    const rewardExpIcon = this.add.text(0, 0, "⭐", {
+    const rewardExpIcon = this.add.text(0, 0, "\u2B50", {
       fontFamily: "Arial",
-      fontSize: "22px",
+      fontSize: "28px",
       color: "#22c55e",
       backgroundColor: "#0b1222"
     })
       .setOrigin(0.5, 0.5)
-      .setPadding(6, 4, 6, 4)
-      .setDepth(60)
+      .setPadding(10, 6, 10, 6)
+      .setDepth(82)
       .setVisible(false)
       .setInteractive({ useHandCursor: true });
 
@@ -2544,6 +2856,7 @@ class MainScene extends Phaser.Scene {
     let glowGfx = null;
     if (def.glow) {
       glowGfx = this.add.graphics();
+      glowGfx.setDepth(10);
       this.uiCam.ignore(glowGfx);
     }
 
@@ -2627,53 +2940,135 @@ class MainScene extends Phaser.Scene {
 
   drawGridVisible() {
     const cam = this.worldCam;
+    cam.preRender();
     const view = cam.worldView;
+    const viewX = view.x;
+    const viewY = view.y;
+    const viewW = view.width;
+    const viewH = view.height;
 
-    const corners = [
-      { x: view.x, y: view.y },
-      { x: view.x + view.width, y: view.y },
-      { x: view.x, y: view.y + view.height },
-      { x: view.x + view.width, y: view.y + view.height }
-    ];
+    const x0 = viewX - TILE_W * 2;
+    const x1 = viewX + viewW + TILE_W * 2;
+    const y0 = viewY - TILE_H * 2;
+    const y1 = viewY + viewH + TILE_H * 2;
 
-    let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+    const slope = TILE_H / TILE_W;
+    const step = TILE_H / 2;
+    const origin = isoToScreen(0, 0);
+    const anchorA = (origin.y - (TILE_H / 2)) - (slope * origin.x);
+    const anchorB = (origin.y - (TILE_H / 2)) + (slope * origin.x);
 
-    for (const p of corners) {
-      const a = p.x / (TILE_W / 2);
-      const b = p.y / (TILE_H / 2);
-      const cf = (a + b) / 2;
-      const rf = (b - a) / 2;
-      minR = Math.min(minR, rf);
-      maxR = Math.max(maxR, rf);
-      minC = Math.min(minC, cf);
-      maxC = Math.max(maxC, cf);
-    }
+    const drawLineFamily = (target, m, anchor, alpha = 1) => {
+      target.lineStyle(1, 0x1e293b, alpha);
 
-    const buffer = 6;
-    const rStart = Math.max(0, Math.floor(minR) - buffer);
-    const rEnd = Math.min(MAP_H - 1, Math.ceil(maxR) + buffer);
-    const cStart = Math.max(0, Math.floor(minC) - buffer);
-    const cEnd = Math.min(MAP_W - 1, Math.ceil(maxC) + buffer);
+      const corners = [
+        { x: x0, y: y0 },
+        { x: x1, y: y0 },
+        { x: x0, y: y1 },
+        { x: x1, y: y1 }
+      ];
 
-    this.gridGfx.clear();
-    this.gridGfx.lineStyle(1, 0x1e293b, 1);
+      let bMin = Infinity;
+      let bMax = -Infinity;
+      for (const p of corners) {
+        const b = p.y - (m * p.x);
+        bMin = Math.min(bMin, b);
+        bMax = Math.max(bMax, b);
+      }
+
+      let b = Math.floor((bMin - anchor) / step) * step + anchor;
+      for (; b <= bMax; b += step) {
+        const pts = [];
+        const tryPoint = (x, y) => {
+          if (x < x0 || x > x1 || y < y0 || y > y1) return;
+          if (pts.some((p) => Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5)) return;
+          pts.push({ x, y });
+        };
+
+        tryPoint(x0, (m * x0) + b);
+        tryPoint(x1, (m * x1) + b);
+        if (m !== 0) {
+          tryPoint((y0 - b) / m, y0);
+          tryPoint((y1 - b) / m, y1);
+        }
+
+        if (pts.length < 2) continue;
+        pts.sort((p1, p2) => (p1.x - p2.x) || (p1.y - p2.y));
+        const pA = pts[0];
+        const pB = pts[pts.length - 1];
+        target.beginPath();
+        target.moveTo(pA.x, pA.y);
+        target.lineTo(pB.x, pB.y);
+        target.strokePath();
+      }
+    };
+
+    // Background grid layer (world space, zooms with camera).
+    const bg = this.bgGridGfx;
+    bg.clear();
+    bg.fillStyle(0x020617, 1);
+    bg.fillRect(x0, y0, x1 - x0, y1 - y0);
+    drawLineFamily(bg, slope, anchorA, 0.45);
+    drawLineFamily(bg, -slope, anchorB, 0.45);
+
+    // Main playable grid (same phase as background, clamped to map).
+    const xMin = viewX - TILE_W;
+    const xMax = viewX + viewW + TILE_W;
+    const yMin = viewY - TILE_H;
+    const yMax = viewY + viewH + TILE_H;
+
+    const dMin = xMin / (TILE_W / 2);
+    const dMax = xMax / (TILE_W / 2);
+    const sMin = yMin / (TILE_H / 2);
+    const sMax = yMax / (TILE_H / 2);
+
+    const rowMin = ((sMin - dMax) / 2) + MAP_CENTER_R;
+    const rowMax = ((sMax - dMin) / 2) + MAP_CENTER_R;
+    const colMin = ((sMin + dMin) / 2) + MAP_CENTER_C;
+    const colMax = ((sMax + dMax) / 2) + MAP_CENTER_C;
+
+    const buffer = 2;
+    const rStart = Math.max(0, Math.floor(rowMin) - buffer);
+    const rEnd = Math.min(MAP_H - 1, Math.ceil(rowMax) + buffer);
+    const cStart = Math.max(0, Math.floor(colMin) - buffer);
+    const cEnd = Math.min(MAP_W - 1, Math.ceil(colMax) + buffer);
+
+    const g = this.gridGfx;
+    g.clear();
+    g.lineStyle(1, 0x1e293b, 1);
 
     for (let r = rStart; r <= rEnd; r++) {
       for (let c = cStart; c <= cEnd; c++) {
         const p = isoToScreen(r, c);
-        this.drawDiamond(this.gridGfx, p.x, p.y, TILE_W, TILE_H, 0x020617, 1);
-        this.outlineDiamond(this.gridGfx, p.x, p.y, TILE_W, TILE_H);
+        this.drawDiamond(g, p.x, p.y, TILE_W, TILE_H, 0x020617, 1);
+        this.outlineDiamond(g, p.x, p.y, TILE_W, TILE_H);
       }
     }
-  }
 
+    // Playable map border (4 lados visibles).
+    const topCenter = isoToScreen(0, 0);
+    const rightCenter = isoToScreen(0, MAP_W - 1);
+    const bottomCenter = isoToScreen(MAP_H - 1, MAP_W - 1);
+    const leftCenter = isoToScreen(MAP_H - 1, 0);
+
+    const vTop = { x: topCenter.x, y: topCenter.y - TILE_H / 2 };
+    const vRight = { x: rightCenter.x + TILE_W / 2, y: rightCenter.y };
+    const vBottom = { x: bottomCenter.x, y: bottomCenter.y + TILE_H / 2 };
+    const vLeft = { x: leftCenter.x - TILE_W / 2, y: leftCenter.y };
+
+    g.lineStyle(3, 0x60a5fa, 0.95);
+    g.beginPath(); g.moveTo(vTop.x, vTop.y); g.lineTo(vRight.x, vRight.y); g.strokePath();
+    g.beginPath(); g.moveTo(vRight.x, vRight.y); g.lineTo(vBottom.x, vBottom.y); g.strokePath();
+    g.beginPath(); g.moveTo(vBottom.x, vBottom.y); g.lineTo(vLeft.x, vLeft.y); g.strokePath();
+    g.beginPath(); g.moveTo(vLeft.x, vLeft.y); g.lineTo(vTop.x, vTop.y); g.strokePath();
+  }
   updateBuildingsTimers() {
     const now = Date.now();
 
     for (const b of buildings.values()) {
       const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
 
-      // encontrar un punto “anchor” (top-left)
+      // encontrar un punto "anchor" (top-left)
       const topLeft = b.cells.reduce((best, cur) => {
         if (!best) return cur;
         return (cur.r + cur.c) < (best.r + best.c) ? cur : best;
@@ -2681,17 +3076,21 @@ class MainScene extends Phaser.Scene {
 
       const p = isoToScreen(topLeft.r, topLeft.c);
 
-      // posición barra (un poquito arriba del edificio)
+      // posicion barra (un poquito arriba del edificio)
       const barX = p.x;
       const barY = p.y - (TILE_H * 0.9);
+      const barWidth = 84;
+      const barHalf = barWidth / 2;
+      const barHeight = 10;
+      const barRadius = 5;
 
-      // ===== Construcción =====
+      // ===== Construccion =====
       if (!b.isBuilt) {
         const total = (b.buildSeconds ?? def.buildSeconds) * 1000;
         const remain = Math.max(0, b.buildEnd - now);
         const done = 1 - (remain / total);
 
-        // dibujar barra construcción
+        // dibujar barra construccion
         b.buildBar.clear();
         b.prodBar.clear();
         b.rewardGoldIcon?.setVisible(false);
@@ -2699,16 +3098,16 @@ class MainScene extends Phaser.Scene {
 
         // fondo
         b.buildBar.fillStyle(0x0b1222, 0.8);
-        b.buildBar.fillRoundedRect(barX - 34, barY, 68, 8, 4);
+        b.buildBar.fillRoundedRect(barX - barHalf, barY, barWidth, barHeight, barRadius);
 
         // progreso
         b.buildBar.fillStyle(0xfbbf24, 1);
-        b.buildBar.fillRoundedRect(barX - 34, barY, 68 * Phaser.Math.Clamp(done, 0, 1), 8, 4);
+        b.buildBar.fillRoundedRect(barX - barHalf, barY, barWidth * Phaser.Math.Clamp(done, 0, 1), barHeight, barRadius);
 
         // listo
         if (remain <= 0) {
           b.isBuilt = true;
-          b.prodStart = now; // empieza producción
+          b.prodStart = now; // empieza produccion
           b.rewardReady = false;
           b.buildBar.clear();
           // reemplaza ghost por edificio final
@@ -2720,7 +3119,7 @@ class MainScene extends Phaser.Scene {
         continue;
       }
 
-      // ===== Producción =====
+      // ===== Produccion =====
     const cycle = b.prodCycle;
     let p01 = 0;
 
@@ -2739,23 +3138,23 @@ class MainScene extends Phaser.Scene {
         p01 = 1;
       }
 
-      // barra producción
+      // barra produccion
       b.prodBar.clear();
       b.prodBar.fillStyle(0x0b1222, 0.75);
-      b.prodBar.fillRoundedRect(barX - 34, barY, 68, 8, 4);
+      b.prodBar.fillRoundedRect(barX - barHalf, barY, barWidth, barHeight, barRadius);
 
       b.prodBar.fillStyle(0x22c55e, 1);
-      b.prodBar.fillRoundedRect(barX - 34, barY, 68 * Phaser.Math.Clamp(p01, 0, 1), 8, 4);
+      b.prodBar.fillRoundedRect(barX - barHalf, barY, barWidth * Phaser.Math.Clamp(p01, 0, 1), barHeight, barRadius);
 
       // iconos de recompensa (manual)
       const showReward = !!b.rewardReady;
       if (b.rewardGoldIcon) {
         b.rewardGoldIcon.setVisible(showReward);
-        if (showReward) b.rewardGoldIcon.setPosition(barX - 16, barY - 24);
+        if (showReward) b.rewardGoldIcon.setPosition(barX - 22, barY - 30);
       }
       if (b.rewardExpIcon) {
         b.rewardExpIcon.setVisible(showReward);
-        if (showReward) b.rewardExpIcon.setPosition(barX + 16, barY - 24);
+        if (showReward) b.rewardExpIcon.setPosition(barX + 22, barY - 30);
       }
 
       // ===== glow para dorado =====
@@ -2777,34 +3176,112 @@ class MainScene extends Phaser.Scene {
   }
 
   setupCameraBounds() {
-    const corners = [
-      isoToScreen(0, 0),
-      isoToScreen(0, MAP_W - 1),
-      isoToScreen(MAP_H - 1, 0),
-      isoToScreen(MAP_H - 1, MAP_W - 1)
-    ];
+    const topCenter = isoToScreen(0, 0);
+    const rightCenter = isoToScreen(0, MAP_W - 1);
+    const bottomCenter = isoToScreen(MAP_H - 1, MAP_W - 1);
+    const leftCenter = isoToScreen(MAP_H - 1, 0);
+
+    const vTop = { x: topCenter.x, y: topCenter.y - TILE_H / 2 };
+    const vRight = { x: rightCenter.x + TILE_W / 2, y: rightCenter.y };
+    const vBottom = { x: bottomCenter.x, y: bottomCenter.y + TILE_H / 2 };
+    const vLeft = { x: leftCenter.x - TILE_W / 2, y: leftCenter.y };
+    this.mapDiamond = [vTop, vRight, vBottom, vLeft];
+    this.mapDiamondVerts = { top: vTop, right: vRight, bottom: vBottom, left: vLeft };
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of corners) {
+    for (const p of this.mapDiamond) {
       minX = Math.min(minX, p.x);
       maxX = Math.max(maxX, p.x);
       minY = Math.min(minY, p.y);
       maxY = Math.max(maxY, p.y);
     }
 
-    minX -= TILE_W;
-    maxX += TILE_W;
-    minY -= TILE_H;
-    maxY += TILE_H;
-
     const worldW = maxX - minX;
     const worldH = maxY - minY;
+    this.worldBounds = { minX, maxX, minY, maxY };
 
-    this.worldCam.setBounds(minX, minY, worldW, worldH);
+    // Bounds amplios para evitar recorte visual del render al alejar.
+    // El limite real de movimiento lo controla clampWorldCamera().
+    const camPad = Math.max(worldW, worldH) + 8192;
+    this.worldCam.setBounds(minX - camPad, minY - camPad, worldW + (camPad * 2), worldH + (camPad * 2));
 
     const mid = isoToScreen(Math.floor(MAP_H / 2), Math.floor(MAP_W / 2));
     this.worldCam.centerOn(mid.x, mid.y);
+    this.clampWorldCamera();
     this.worldCam.preRender();
+  }
+
+  clampWorldCamera() {
+    const cam = this.worldCam;
+    const b = this.worldBounds;
+    const verts = this.mapDiamondVerts;
+    if (!cam || !b) return;
+
+    const viewW = cam.width / cam.zoom;
+    const viewH = cam.height / cam.zoom;
+    if (!verts) {
+      // Fallback simple por rectangulo si aun no existen vertices.
+      const minScrollX = b.minX;
+      const maxScrollX = Math.max(minScrollX, b.maxX - viewW);
+      const minScrollY = b.minY;
+      const maxScrollY = Math.max(minScrollY, b.maxY - viewH);
+      cam.scrollX = Phaser.Math.Clamp(cam.scrollX, minScrollX, maxScrollX);
+      cam.scrollY = Phaser.Math.Clamp(cam.scrollY, minScrollY, maxScrollY);
+      return;
+    }
+
+    const vTop = verts.top;
+    const vRight = verts.right;
+    const vBottom = verts.bottom;
+    const vLeft = verts.left;
+
+    const lerpXByY = (p0, p1, y) => {
+      const dy = p1.y - p0.y;
+      if (Math.abs(dy) < 0.0001) return p0.x;
+      const t = Phaser.Math.Clamp((y - p0.y) / dy, 0, 1);
+      return p0.x + ((p1.x - p0.x) * t);
+    };
+
+    const leftEdgeXAtY = (y) => {
+      if (y <= vLeft.y) return lerpXByY(vTop, vLeft, y);
+      return lerpXByY(vLeft, vBottom, y);
+    };
+
+    const rightEdgeXAtY = (y) => {
+      if (y <= vRight.y) return lerpXByY(vTop, vRight, y);
+      return lerpXByY(vRight, vBottom, y);
+    };
+
+    // Clamp por "punto de enfoque" dentro del rombo:
+    // permite ver/editar todos los bordes en zoom min y max, sin pasarse del limite.
+    const focusOffX = viewW * 0.5;
+    const focusOffY = viewH * 0.56;
+    const padX = Math.max(10 / cam.zoom, TILE_W * 0.16);
+    const padY = Math.max(10 / cam.zoom, TILE_H * 0.32);
+
+    let focusY = cam.scrollY + focusOffY;
+    const minFocusY = vTop.y + padY;
+    const maxFocusY = vBottom.y - padY;
+    if (minFocusY <= maxFocusY) {
+      focusY = Phaser.Math.Clamp(focusY, minFocusY, maxFocusY);
+    } else {
+      focusY = (vTop.y + vBottom.y) * 0.5;
+    }
+    cam.scrollY = focusY - focusOffY;
+
+    const leftX = leftEdgeXAtY(focusY) + padX;
+    const rightX = rightEdgeXAtY(focusY) - padX;
+    let minScrollX = leftX - focusOffX;
+    let maxScrollX = rightX - focusOffX;
+
+    // Evita rango invertido en extremos.
+    if (minScrollX > maxScrollX) {
+      const centerX = (leftX + rightX) * 0.5;
+      minScrollX = centerX - focusOffX;
+      maxScrollX = minScrollX;
+    }
+
+    cam.scrollX = Phaser.Math.Clamp(cam.scrollX, minScrollX, maxScrollX);
   }
 }
 
@@ -2815,6 +3292,8 @@ const config = {
   type: Phaser.AUTO,
   width: 1920,
   height: 1080,
+  transparent: true,
+  backgroundColor: "rgba(0,0,0,0)",
   parent: "game",
   scene: MainScene,
   scale: {
@@ -2824,3 +3303,7 @@ const config = {
 };
 
 new Phaser.Game(config);
+
+
+
+
