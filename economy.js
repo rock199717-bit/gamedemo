@@ -9,14 +9,15 @@
 // - No gasta tickets ni da oro/exp por tirar deseos (solo da items).
 // =========================
 
-const MAX_LEVEL = 100;
+const MAX_LEVEL = 150;
+const MAX_EXP_LABEL = "MAX.";
 const GACHA_BTN_TEXTURE_KEY = "ui_gachapon_btn";
-const GREEN_HOUSE_ICON_HTML = `<img src="img/green_casa1x1_normal.png" alt="Casa Comun" style="width:18px;height:auto;display:inline-block;vertical-align:middle;">`;
+const GREEN_HOUSE_ICON_HTML = `<img src="img/green_casa1x1_normal.png" alt="Casa Decorativa" style="width:18px;height:auto;display:inline-block;vertical-align:middle;">`;
 
 // ===== ITEMS (lo que \u201Csale\u201D del gachapon / banner) =====
 const ITEM_DEFS = {
   // ===== VERDE (1\u2605/2\u2605/3\u2605) =====
-  green_1:       { key: "green_1",       name: "Casa Comun",    icon: GREEN_HOUSE_ICON_HTML, size: 1, rarity: 1 },
+  green_1:       { key: "green_1",       name: "Casa Decorativa", icon: GREEN_HOUSE_ICON_HTML, size: 1, rarity: 1 },
   green_2:       { key: "green_2",       name: "Verde 2x2",     icon: "\uD83D\uDFE9", size: 2, rarity: 2 },
   green_3:       { key: "green_3",       name: "Verde 3x3",     icon: "\uD83D\uDFE9", size: 3, rarity: 3 },
   green_4:       { key: "green_4",       name: "Verde 4x4",     icon: "\uD83D\uDFE9\u2728", size: 4, rarity: 4 },
@@ -145,6 +146,21 @@ class EconomySystem {
     return Math.floor(base30 + (180 * t) + (55 * Math.pow(t, 1.8)));
   }
 
+  applyLevelRewards(levelReached) {
+    // Rewards por subir nivel:
+    // hasta 30: +10 perm, +5 lim, +10000 oro
+    // luego: +3 perm, +3 lim, +1000 oro
+    if (levelReached <= 30) {
+      this.wishesPermanent += 10;
+      this.wishesLimited += 5;
+      this.gold += 10000;
+    } else {
+      this.wishesPermanent += 3;
+      this.wishesLimited += 3;
+      this.gold += 1000;
+    }
+  }
+
   addExp(amount) {
     if (this.level >= MAX_LEVEL) return;
 
@@ -154,19 +170,7 @@ class EconomySystem {
       this.exp -= this.expToNext;
       this.level++;
       this.expToNext = this.calcExpToNext();
-
-      // Rewards por subir nivel (como pediste)
-      // hasta 30: +10 perm, +5 lim, +10000 oro
-      // luego: +3 perm, +3 lim, +1000 oro
-      if (this.level <= 30) {
-        this.wishesPermanent += 10;
-        this.wishesLimited += 5;
-        this.gold += 10000;
-      } else {
-        this.wishesPermanent += 3;
-        this.wishesLimited += 3;
-        this.gold += 1000;
-      }
+      this.applyLevelRewards(this.level);
     }
 
     this.refreshUI();
@@ -284,6 +288,32 @@ class EconomySystem {
       if (st.display !== "none" && st.visibility !== "hidden") return true;
     }
     return false;
+  }
+
+  formatCompactValue(value, threshold, suffix) {
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    if (n < threshold) return null;
+    const scaled = n / threshold;
+    const decimals = scaled >= 10 ? 1 : 2;
+    const txt = scaled
+      .toFixed(decimals)
+      .replace(/\.0+$/, "")
+      .replace(/(\.\d*[1-9])0+$/, "$1");
+    return `${txt}${suffix}`;
+  }
+
+  formatGoldHUD(value) {
+    const compact = this.formatCompactValue(value, 1_000_000, "M");
+    if (compact) return compact;
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    return String(n);
+  }
+
+  formatWishHUD(value) {
+    const compact = this.formatCompactValue(value, 1_000, "K");
+    if (compact) return compact;
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    return String(n);
   }
 
   // =========================
@@ -442,6 +472,11 @@ class EconomySystem {
   }
   createUI() {
     const s = this.scene;
+    const linear = Phaser?.Textures?.FilterMode?.LINEAR;
+    if (linear !== undefined) {
+      s.textures?.get?.("ui_moneda_icon")?.setFilter?.(linear);
+      s.textures?.get?.("ui_exp_icon")?.setFilter?.(linear);
+    }
 
     const style = (bg = "#0b1222", color = "#e5e7eb") => ({
       fontFamily: "Arial",
@@ -475,8 +510,9 @@ class EconomySystem {
       .setOrigin(1, 0)
       .setPadding(8, 6)
       .setScrollFactor(0)
-      .setDepth(9999);
+      .setDepth(10005);
     addHudShadow(this.levelText);
+    this.levelText.setVisible(false);
 
     // EXP label (centrado dentro de la barra)
     this.expText = s.add.text(0, 30, "", {
@@ -495,22 +531,40 @@ class EconomySystem {
       ? s.add.image(0, 30, "ui_exp_icon")
         .setOrigin(0.5, 0.5)
         .setScrollFactor(0)
-        .setDepth(10000)
+        .setDepth(10004)
       : null;
+    this.expStarLevelText = s.add.text(0, 30, "", {
+      fontFamily: "Arial",
+      fontSize: "30px",
+      fontStyle: "bold",
+      color: "#f7e733",
+      stroke: "#113c50",
+      strokeThickness: 5
+    })
+      .setOrigin(0.5, 0.5)
+      .setScrollFactor(0)
+      .setDepth(10006);
+    addHudShadow(this.expStarLevelText);
 
-    // EXP bar
-    this.expBarBg = s.add.rectangle(0, 30, 140, 8, 0x1e293b)
-      .setOrigin(0, 0)
+    // EXP bar (estilo inspirado en tu referencia PNG)
+    this.expBarBg = s.add.graphics()
       .setScrollFactor(0)
       .setDepth(9999);
-    this.expBarBg.setStrokeStyle(1, 0x94a3b8, 0.8);
-
-    this.expBarFill = s.add.rectangle(0, 30, 140, 8, 0x22c55e)
-      .setOrigin(0, 0)
+    this.expBarFill = s.add.graphics()
       .setScrollFactor(0)
       .setDepth(10000);
+    this.expBarGloss = s.add.graphics()
+      .setScrollFactor(0)
+      .setDepth(10001);
+    this.expBarFrame = s.add.graphics()
+      .setScrollFactor(0)
+      .setDepth(10002);
     this.expBarWidth = 140;
     this.expBarHeight = 8;
+    this.expBarBorder = 2;
+    this.expBarRadius = 8;
+    this.expBarX = 0;
+    this.expBarY = 0;
 
     // Deseos (perm / limited)
     this.permWishText = s.add.text(0, 12, "", style("#10243d", "#dbeafe"))
@@ -682,11 +736,35 @@ class EconomySystem {
       .setInteractive({ useHandCursor: true })
       .setDepth(9999);
 
+    this.devGoldBtn = s.add.text(0, 52, "+100K Oro", {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#e2e8f0",
+      backgroundColor: "#0f766e"
+    })
+      .setOrigin(0, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
     this.devExpBtn = s.add.text(0, 52, "+50 EXP", {
       fontFamily: "Arial",
       fontSize: "14px",
       color: "#e2e8f0",
       backgroundColor: "#1e293b"
+    })
+      .setOrigin(0, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
+    this.devMaxLevelBtn = s.add.text(0, 52, "Nivel MAX", {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#e2e8f0",
+      backgroundColor: "#7c2d12"
     })
       .setOrigin(0, 0)
       .setPadding(8, 5)
@@ -744,10 +822,34 @@ class EconomySystem {
       this.updateModalCounts();
     });
 
+    this.devGoldBtn.on("pointerdown", (pointer) => {
+      if (this.hasBlockingOverlayOpen()) return;
+      s.uiGuard?.(pointer);
+      this.addGold(100000);
+    });
+
     this.devExpBtn.on("pointerdown", (pointer) => {
       if (this.hasBlockingOverlayOpen()) return;
       s.uiGuard?.(pointer);
       this.addExp(50);
+    });
+
+    this.devMaxLevelBtn.on("pointerdown", (pointer) => {
+      if (this.hasBlockingOverlayOpen()) return;
+      s.uiGuard?.(pointer);
+      if (this.level >= MAX_LEVEL) {
+        this.refreshUI();
+        this.updateModalCounts();
+        return;
+      }
+      while (this.level < MAX_LEVEL) {
+        this.level++;
+        this.applyLevelRewards(this.level);
+      }
+      this.exp = 0;
+      this.expToNext = this.calcExpToNext();
+      this.refreshUI();
+      this.updateModalCounts();
     });
 
     // Layout inicial
@@ -762,15 +864,20 @@ class EconomySystem {
       this.levelText,
       this.expText,
       this.expUiIcon,
+      this.expStarLevelText,
       this.expBarBg,
       this.expBarFill,
+      this.expBarGloss,
+      this.expBarFrame,
       this.permWishText,
       this.limitedWishText,
       this.gachaBtnGlow,
       this.gachaBtn,
       this.devPermBtn,
       this.devLimitedBtn,
-      this.devExpBtn
+      this.devGoldBtn,
+      this.devExpBtn,
+      this.devMaxLevelBtn
     ].filter(Boolean);
 
     if (Array.isArray(s.uiObjects)) {
@@ -794,26 +901,38 @@ class EconomySystem {
     const top = isCompact ? 8 : 10;
     const gap = isTiny ? 8 : 10;
 
-    const formatNum = (n) => {
-      const v = Number.isFinite(n) ? n : Number(n) || 0;
-      return Math.round(v).toLocaleString("es-PE");
-    };
+    this.goldText.setText(this.formatGoldHUD(this.gold));
+    this.levelText.setText(`Lv${this.level}`);
+    this.levelText.setVisible(false);
+    const permHUD = this.formatWishHUD(this.wishesPermanent);
+    const limHUD = this.formatWishHUD(this.wishesLimited);
+    this.permWishText.setText(isTiny ? `Perm:${permHUD}` : `Perm: ${permHUD}`);
+    this.limitedWishText.setText(isTiny ? `Lim:${limHUD}` : `Lim: ${limHUD}`);
+    this.expText.setText(this.level >= MAX_LEVEL ? MAX_EXP_LABEL : `${this.exp}/${this.expToNext}`);
+    const starLevelHUD = String(Math.max(0, this.level)).padStart(2, "0");
+    if (this.expStarLevelText?.setText) this.expStarLevelText.setText(starLevelHUD);
 
-    this.goldText.setText(formatNum(this.gold));
-    this.levelText.setText(`Lv ${this.level}`);
-    this.permWishText.setText(isTiny ? `Perm:${this.wishesPermanent}` : `Perm: ${this.wishesPermanent}`);
-    this.limitedWishText.setText(isTiny ? `Lim:${this.wishesLimited}` : `Lim: ${this.wishesLimited}`);
-    this.expText.setText(this.level >= MAX_LEVEL ? "MAX" : `${this.exp}/${this.expToNext}`);
-
-    const fontSize = isTiny ? 15 : 18;
-    const smallFont = isTiny ? 12 : 13;
-    const padX = isTiny ? 10 : 12;
-    const padY = isTiny ? 6 : 7;
+    const fontSize = isTiny ? 20 : 26;
+    const smallFont = isTiny ? 15 : 17;
+    const padX = isTiny ? 12 : 16;
+    const padY = isTiny ? 8 : 9;
 
     const apply = (el, f = fontSize, px = padX, py = padY) => {
       if (!el) return;
       if (typeof el.setFontSize === "function") el.setFontSize(f);
       if (typeof el.setPadding === "function") el.setPadding(px, py);
+    };
+    const applyFixedWidth = (el, width) => {
+      if (!el || typeof el.setFixedSize !== "function") return;
+      el.setFixedSize(width, 0);
+      if (typeof el.setAlign === "function") el.setAlign("center");
+    };
+    const measureTextPx = (text, sizePx = fontSize, bold = true) => {
+      this.hudMeasureCanvas = this.hudMeasureCanvas || document.createElement("canvas");
+      const ctx = this.hudMeasureCanvas.getContext("2d");
+      if (!ctx) return Math.ceil((String(text).length || 1) * (sizePx * 0.62));
+      ctx.font = `${bold ? "bold " : ""}${sizePx}px Arial`;
+      return Math.ceil(ctx.measureText(String(text)).width);
     };
     const getUIWidth = (el) => (el?.displayWidth ?? el?.width ?? 0);
     const getUIHeight = (el) => (el?.displayHeight ?? el?.height ?? 0);
@@ -821,22 +940,23 @@ class EconomySystem {
       if (!this.gachaBtnGlow || !this.gachaBtn) return;
       this.gachaBtnGlow.setPosition(this.gachaBtn.x, this.gachaBtn.y);
     };
-    const iconTarget = isTiny ? 22 : 26;
-    const iconGap = isTiny ? 4 : 6;
+    const goldIconTarget = isTiny ? 44 : 56;
+    const expIconTarget = isTiny ? 60 : 74;
+    const iconGap = isTiny ? 10 : 14;
 
-    const fitIcon = (icon) => {
+    const fitIcon = (icon, targetSize) => {
       if (!icon) return 0;
       const srcW = icon.width || 1;
       const srcH = icon.height || 1;
       const maxSide = Math.max(srcW, srcH);
-      const scale = iconTarget / maxSide;
+      const scale = targetSize / maxSide;
       icon.setScale(scale);
       icon.setVisible(true);
       return icon.displayWidth;
     };
 
-    const goldIconW = fitIcon(this.goldUiIcon);
-    const expIconW = fitIcon(this.expUiIcon);
+    const goldIconW = fitIcon(this.goldUiIcon, goldIconTarget);
+    const expIconW = fitIcon(this.expUiIcon, expIconTarget);
 
     const getExtraWidth = (el) => {
       if (el === this.goldText && goldIconW > 0) return goldIconW + iconGap;
@@ -853,13 +973,21 @@ class EconomySystem {
     };
 
     apply(this.goldText);
-    apply(this.levelText);
     apply(this.permWishText);
     apply(this.limitedWishText);
-    if (this.expText?.setFontSize) this.expText.setFontSize(isTiny ? 12 : 14);
+    if (this.expText?.setFontSize) this.expText.setFontSize(isTiny ? 16 : 20);
+
+    // Reserva exacta para: Oro 6 digitos, Deseos (texto + 3 digitos).
+    const slotPad = (padX * 2) + (isTiny ? 6 : 8);
+    const goldSlotW = measureTextPx("999999", fontSize, true) + slotPad;
+    const permSlotW = measureTextPx(isTiny ? "Perm:999" : "Perm: 999", fontSize, true) + slotPad;
+    const limSlotW = measureTextPx(isTiny ? "Lim:999" : "Lim: 999", fontSize, true) + slotPad;
+    applyFixedWidth(this.goldText, goldSlotW);
+    applyFixedWidth(this.permWishText, permSlotW);
+    applyFixedWidth(this.limitedWishText, limSlotW);
 
     if (this.gachaBtnIsImage) {
-      const targetH = isTiny ? 40 : 48;
+      const targetH = isTiny ? 54 : 66;
       this.gachaBtnBaseScale = targetH / this.gachaBtn.height;
       const hoverMul = this.gachaBtnHovering ? 1.03 : 1;
       this.gachaBtn.setScale(this.gachaBtnBaseScale * hoverMul);
@@ -870,17 +998,24 @@ class EconomySystem {
     } else {
       apply(this.gachaBtn, fontSize, padX + 2, padY);
     }
-    apply(this.adminLabel, isTiny ? 11 : 12, 0, 0);
-    apply(this.devPermBtn, smallFont, isTiny ? 8 : 10, isTiny ? 5 : 6);
-    apply(this.devLimitedBtn, smallFont, isTiny ? 8 : 10, isTiny ? 5 : 6);
-    apply(this.devExpBtn, smallFont, isTiny ? 8 : 10, isTiny ? 5 : 6);
+    apply(this.adminLabel, isTiny ? 12 : 14, 0, 0);
+    apply(this.devPermBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devLimitedBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devGoldBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devExpBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devMaxLevelBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
 
-    this.expBarWidth = isTiny ? 150 : 190;
-    this.expBarHeight = isTiny ? 12 : 14;
-    this.expBarBg.width = this.expBarWidth;
-    this.expBarBg.height = this.expBarHeight;
-    this.expBarBg.setStrokeStyle(1, 0x94a3b8, 0.8);
-    this.expBarFill.height = this.expBarHeight;
+    this.expBarWidth = isTiny ? 220 : 300;
+    this.expBarHeight = isTiny ? 24 : 30;
+    this.expBarBorder = isTiny ? 4 : 5;
+    this.expBarRadius = Math.round(this.expBarHeight * 0.5);
+    if (this.expStarLevelText?.setFontSize) {
+      const starDigits = String(Math.max(0, this.level)).length;
+      const starFont = isTiny
+        ? (starDigits >= 3 ? 24 : 28)
+        : (starDigits >= 3 ? 28 : 32);
+      this.expStarLevelText.setFontSize(starFont);
+    }
 
     let x = right;
     this.gachaBtn.y = top;
@@ -888,26 +1023,30 @@ class EconomySystem {
     x -= (getUIWidth(this.gachaBtn) + gap);
 
     const infoH = Math.max(
-      getUIHeight(this.levelText),
       getUIHeight(this.goldText),
       getUIHeight(this.permWishText),
       getUIHeight(this.limitedWishText)
     );
-    const barY = top + Math.max(0, Math.round((infoH - this.expBarHeight) / 2));
-    const topRow = [this.limitedWishText, this.permWishText, this.goldText, this.levelText];
+    const expVisualH = Math.max(this.expBarHeight, this.expUiIcon ? getUIHeight(this.expUiIcon) : 0);
+    const rowH = Math.max(infoH, expVisualH);
+    const barY = top + Math.max(0, Math.round((rowH - this.expBarHeight) / 2));
+    const topRow = [this.limitedWishText, this.permWishText, this.goldText];
     topRow.forEach((el) => {
       el.y = top;
       el.x = x;
       x -= (getBlockWidth(el) + gap);
     });
 
-    // EXP queda a la izquierda de Lv.
-    const expBlockW = this.expBarWidth + (this.expUiIcon ? (expIconW + iconGap) : 0);
+    const starToBarGap = isTiny ? 12 : 16;
+    // Bloque EXP reservado completo: estrella izquierda + barra.
+    const expBlockW = this.expBarWidth + (this.expUiIcon ? (expIconW + starToBarGap) : 0);
     x -= expBlockW;
-    const barLeft = x + (this.expUiIcon ? (expIconW + iconGap) : 0);
+    const barLeft = x + (this.expUiIcon ? (expIconW + starToBarGap) : 0);
 
-    this.expBarBg.x = barLeft;
-    this.expBarBg.y = barY;
+    this.expBarX = barLeft;
+    this.expBarY = barY;
+    this.drawExpBarBackground();
+    this.drawExpBarFrame();
     const ratio = (this.level >= MAX_LEVEL) ? 1 : ((this.expToNext <= 0) ? 0 : (this.exp / this.expToNext));
     this.setExpBarRatio(ratio);
 
@@ -917,18 +1056,29 @@ class EconomySystem {
       this.expUiIcon.x = x + (expIconW * 0.5);
       this.expUiIcon.y = this.expText.y;
       this.expUiIcon.setVisible(true);
+      if (this.expStarLevelText) {
+        this.expStarLevelText.x = this.expUiIcon.x;
+        this.expStarLevelText.y = this.expUiIcon.y;
+        this.expStarLevelText.setVisible(true);
+      }
+    } else if (this.expStarLevelText) {
+      this.expStarLevelText.setVisible(false);
     }
+    this.levelText.y = top;
+    this.levelText.x = x;
 
     placeIconForText(this.goldUiIcon, this.goldText);
     syncGachaGlowPos();
 
-    const panelPad = isTiny ? 7 : 8;
-    const btnGap = isTiny ? 5 : 6;
+    const panelPad = isTiny ? 8 : 10;
+    const btnGap = isTiny ? 6 : 8;
     const panelW = Math.max(
       getUIWidth(this.adminLabel),
       getUIWidth(this.devPermBtn),
       getUIWidth(this.devLimitedBtn),
-      getUIWidth(this.devExpBtn)
+      getUIWidth(this.devGoldBtn),
+      getUIWidth(this.devExpBtn),
+      getUIWidth(this.devMaxLevelBtn)
     ) + (panelPad * 2);
     const panelH = panelPad
       + getUIHeight(this.adminLabel)
@@ -937,7 +1087,11 @@ class EconomySystem {
       + btnGap
       + getUIHeight(this.devLimitedBtn)
       + btnGap
+      + getUIHeight(this.devGoldBtn)
+      + btnGap
       + getUIHeight(this.devExpBtn)
+      + btnGap
+      + getUIHeight(this.devMaxLevelBtn)
       + panelPad;
 
     const adminX = right - panelW;
@@ -955,8 +1109,14 @@ class EconomySystem {
     this.devLimitedBtn.x = contentX;
     this.devLimitedBtn.y = this.devPermBtn.y + getUIHeight(this.devPermBtn) + btnGap;
 
+    this.devGoldBtn.x = contentX;
+    this.devGoldBtn.y = this.devLimitedBtn.y + getUIHeight(this.devLimitedBtn) + btnGap;
+
     this.devExpBtn.x = contentX;
-    this.devExpBtn.y = this.devLimitedBtn.y + getUIHeight(this.devLimitedBtn) + btnGap;
+    this.devExpBtn.y = this.devGoldBtn.y + getUIHeight(this.devGoldBtn) + btnGap;
+
+    this.devMaxLevelBtn.x = contentX;
+    this.devMaxLevelBtn.y = this.devExpBtn.y + getUIHeight(this.devExpBtn) + btnGap;
 
     this.adminPanelBg.x = adminX;
     this.adminPanelBg.y = adminY;
@@ -964,29 +1124,97 @@ class EconomySystem {
     this.adminPanelBg.height = panelH;
   }
 
+  drawExpBarBackground() {
+    if (!this.expBarBg) return;
+    const x = this.expBarX || 0;
+    const y = this.expBarY || 0;
+    const w = this.expBarWidth || 0;
+    const h = this.expBarHeight || 0;
+    const r = this.expBarRadius || Math.round(h * 0.5);
+    this.expBarBg.clear();
+    // Track dorado/marron
+    this.expBarBg.fillStyle(0x7d6a42, 1);
+    this.expBarBg.fillRoundedRect(x, y, w, h, r);
+    // Sombra interior superior para dar look cartoon
+    this.expBarBg.fillStyle(0x4d3f23, 0.32);
+    this.expBarBg.fillRoundedRect(x + 2, y + 2, Math.max(0, w - 4), Math.max(2, Math.floor(h * 0.28)), Math.max(2, r - 2));
+  }
+
+  drawExpBarFrame() {
+    if (!this.expBarFrame) return;
+    const x = this.expBarX || 0;
+    const y = this.expBarY || 0;
+    const w = this.expBarWidth || 0;
+    const h = this.expBarHeight || 0;
+    const border = this.expBarBorder || 2;
+    const radius = this.expBarRadius || Math.max(3, Math.round(h * 0.5));
+    this.expBarFrame.clear();
+    // borde externo oscuro + borde crema interno
+    this.expBarFrame.lineStyle(border + 2, 0x4d3f23, 0.65);
+    this.expBarFrame.strokeRoundedRect(x, y, w, h, radius);
+    this.expBarFrame.lineStyle(border, 0xf6eed8, 1);
+    this.expBarFrame.strokeRoundedRect(x, y, w, h, radius);
+  }
+
   setExpBarRatio(value) {
+    if (!this.expBarFill) return;
     const clamped = Phaser.Math.Clamp(value, 0, 1);
     const h = this.expBarHeight || 8;
-    this.expBarFill.x = this.expBarBg.x;
-    this.expBarFill.y = this.expBarBg.y;
-    this.expBarFill.width = (this.expBarWidth || 0) * clamped;
-    this.expBarFill.height = h;
-    this.expBarFill.scaleX = 1;
-    this.expBarFill.scaleY = 1;
+    const border = this.expBarBorder || 2;
+    const x = this.expBarX || 0;
+    const y = this.expBarY || 0;
+    const radius = this.expBarRadius || Math.max(3, Math.round(h * 0.5));
+    const inset = border + 1;
+    const innerW = Math.max(0, (this.expBarWidth || 0) - (inset * 2));
+    const innerH = Math.max(1, h - (inset * 2));
+    const fillW = innerW * clamped;
+    const fillR = Math.max(2, Math.min(Math.round(innerH * 0.5), Math.round(fillW * 0.5)));
+
+    this.expBarFill.clear();
+    if (fillW > 0) {
+      // Fill plomo metalico base
+      this.expBarFill.fillStyle(0x9ca5b0, 1);
+      this.expBarFill.fillRoundedRect(x + inset, y + inset, fillW, innerH, fillR);
+      // Reflejo metalico superior
+      this.expBarFill.fillStyle(0xeff3f7, 0.7);
+      this.expBarFill.fillRoundedRect(x + inset + 1, y + inset + 1, Math.max(0, fillW - 2), Math.max(2, Math.floor(innerH * 0.5)), Math.max(2, fillR - 1));
+      // Sombra inferior para profundidad
+      this.expBarFill.fillStyle(0x66707e, 0.28);
+      this.expBarFill.fillRoundedRect(
+        x + inset + 1,
+        y + inset + Math.max(1, Math.floor(innerH * 0.5)),
+        Math.max(0, fillW - 2),
+        Math.max(1, Math.floor(innerH * 0.45)),
+        Math.max(2, fillR - 1)
+      );
+    }
+
+    if (this.expBarGloss) {
+      this.expBarGloss.clear();
+      if (fillW > 0) {
+        this.expBarGloss.fillStyle(0xffffff, 0.18);
+        this.expBarGloss.fillRoundedRect(
+          x + inset + 2,
+          y + inset + 2,
+          Math.max(0, fillW - 4),
+          Math.max(1, Math.floor(innerH * 0.28)),
+          Math.max(2, fillR - 2)
+        );
+      }
+    }
   }
 
   refreshUI() {
-    const formatNum = (n) => {
-      const v = Number.isFinite(n) ? n : Number(n) || 0;
-      return Math.round(v).toLocaleString("es-PE");
-    };
-
-    this.goldText.setText(`${formatNum(this.gold)}`);
-    this.levelText.setText(`Lv ${this.level}`);
+    this.goldText.setText(`${this.formatGoldHUD(this.gold)}`);
+    this.levelText.setText(`Lv${this.level}`);
+    this.levelText.setVisible(false);
+    if (this.expStarLevelText?.setText) {
+      this.expStarLevelText.setText(String(Math.max(0, this.level)).padStart(2, "0"));
+    }
 
     // deseos separados
-    this.permWishText.setText(`Perm: ${this.wishesPermanent}`);
-    this.limitedWishText.setText(`Lim: ${this.wishesLimited}`);
+    this.permWishText.setText(`Perm: ${this.formatWishHUD(this.wishesPermanent)}`);
+    this.limitedWishText.setText(`Lim: ${this.formatWishHUD(this.wishesLimited)}`);
 
     // exp text + bar
     const cur = this.exp;
@@ -994,7 +1222,7 @@ class EconomySystem {
 
     if (this.level >= MAX_LEVEL) {
       this.setExpBarRatio(1);
-      this.expText.setText(`MAX`);
+      this.expText.setText(MAX_EXP_LABEL);
     } else {
       this.expText.setText(`${cur}/${next}`);
       const ratio = (next <= 0) ? 0 : (cur / next);

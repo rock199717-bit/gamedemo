@@ -10,19 +10,39 @@ const TILE_W = 64;
 const TILE_H = 32;
 
 // =========================
+// WORLD PALETTE (grid/suelo)
+// =========================
+const WORLD_BG_GRASS_COLOR = 0x79b44a;
+const WORLD_TILE_GRASS_COLOR = 0x84c253;
+const WORLD_BG_GRID_LINE_COLOR = 0x5e8f3c;
+const WORLD_GRID_LINE_COLOR = 0x6ea646;
+const WORLD_MAP_BORDER_COLOR = 0x4f7f2b;
+
+// =========================
+// DECOR AURA (Casa Decorativa green_1)
+// =========================
+const DECOR_AURA_MAX_LEVEL = 5;
+const DECOR_AURA_MAX_STACKS = 5;
+const DECOR_AURA_BUILD_REDUCTION_MAX = 0.03; // -3% construccion al evo max
+const DECOR_AURA_PROD_BOOST_MAX = 0.02;      // +2% produccion al evo max
+// Base equivalente al tamano que antes tenia aprox en evo 4; luego crece suavemente.
+const DECOR_AURA_RADIUS_BASE_TILES = 2.0;
+const DECOR_AURA_RADIUS_PER_LEVEL_TILES = 0.12;
+
+// =========================
 // BUILDING TYPES (WORLD)
 // =========================
 const BUILDING_TYPES = {
   // [OK] verdes basicos (lo que ya tenias "de prueba")
   green_1: {
     key: "green_1",
-    label: "Casa Comun",
+    label: "Casa Decorativa",
     size: 1,
     fill: 0x22c55e,
     border: 0x22c55e,
     buildSeconds: 5,
-    prodSeconds: 60,
-    reward: { exp: 1, gold: 10 },
+    prodSeconds: 0,
+    reward: { exp: 0, gold: 0 },
     glow: false
   },
   green_2: {
@@ -348,6 +368,7 @@ class MainScene extends Phaser.Scene {
     // ===== Mundo =====
     this.bgGridGfx = this.add.graphics();
     this.gridGfx = this.add.graphics();
+    this.buffAreaGhost = this.add.graphics();
     this.ghost = this.add.graphics();
     this.moveGhost = this.add.graphics();
     this.ghostSprite = this.add.image(0, 0, "green_house_1x1_normal")
@@ -362,9 +383,10 @@ class MainScene extends Phaser.Scene {
       .setDepth(6);
     this.bgGridGfx.setDepth(-5);
     this.gridGfx.setDepth(-4);
+    this.buffAreaGhost.setDepth(-3);
 
     // por defecto, UI cam NO debe renderizar el mundo
-    this.uiCam.ignore([this.bgGridGfx, this.gridGfx, this.ghost, this.moveGhost, this.ghostSprite, this.moveGhostSprite]);
+    this.uiCam.ignore([this.bgGridGfx, this.gridGfx, this.buffAreaGhost, this.ghost, this.moveGhost, this.ghostSprite, this.moveGhostSprite]);
 
     // ===== Estado input =====
     this.isDragging = false;
@@ -377,6 +399,7 @@ class MainScene extends Phaser.Scene {
     this.pending = null;
     this.selectedBuildingId = null;
     this.moveMode = null;
+    this.hoverAuraBuildingId = null;
     // [OK] item seleccionado para construir (por defecto el verde 1x1)
     this.selectedBuildKey = "green_1";
 
@@ -452,8 +475,14 @@ class MainScene extends Phaser.Scene {
     });
 
     this.input.on("pointermove", (pointer) => {
-      if (this.hasBlockingDomOverlay()) return;
-      if (pointer.y <= 140) return;
+      if (this.hasBlockingDomOverlay()) {
+        this.clearBuffAreaGhost();
+        return;
+      }
+      if (pointer.y <= 140) {
+        this.clearBuffAreaGhost();
+        return;
+      }
 
       // PAN: arrastre izquierdo siempre
       if (pointer.isDown && pointer.leftButtonDown()) {
@@ -484,6 +513,7 @@ class MainScene extends Phaser.Scene {
       // ghost build
       if (mode !== "build" || this.selectedBuildingId) {
         this.ghostSprite?.setVisible(false);
+        this.updateBuffAreaGhostFromPointer(pointer);
         return;
       }
 
@@ -496,6 +526,7 @@ class MainScene extends Phaser.Scene {
       const tile = screenToIsoTile(pointer.worldX, pointer.worldY);
       this.ghost.clear();
       if (!tile) {
+        this.clearBuffAreaGhost();
         this.ghostSprite?.setVisible(false);
         return;
       }
@@ -514,6 +545,7 @@ class MainScene extends Phaser.Scene {
         }
       }
       this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.25, ok ? okBorder : badColor);
+      this.drawBuffAreaGhostForPlacement(preview.typeKey, tile.r, tile.c, size, 0);
 
       if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
         this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
@@ -613,10 +645,22 @@ class MainScene extends Phaser.Scene {
       // si estas arriba del UI, oculta el ghost
       if (p.y <= 140) {
         this.moveGhost.clear();
+        this.clearBuffAreaGhost();
         this.moveGhostSprite?.setVisible(false);
       } else {
         const tile = screenToIsoTile(p.worldX, p.worldY);
         this.renderMoveGhost(tile);
+      }
+    }
+
+    if (this.hoverAuraBuildingId) {
+      const p = this.input.activePointer;
+      if (this.hasBlockingDomOverlay() || mode === "build" || this.moveMode || p.y <= 140) {
+        this.clearBuffAreaGhost();
+      } else {
+        const auraB = buildings.get(this.hoverAuraBuildingId);
+        if (this.isAuraSourceBuilding(auraB)) this.drawBuffAreaGhostForBuilding(auraB);
+        else this.clearBuffAreaGhost();
       }
     }
 
@@ -829,6 +873,7 @@ class MainScene extends Phaser.Scene {
     }
     mode = "build";
     this.modeText.setText(this.modeLabel());
+    this.clearBuffAreaGhost();
     this.cancelBuildBtn.setVisible(true);
     this.cancelBuildBorder.setVisible(true);
   }
@@ -838,6 +883,7 @@ class MainScene extends Phaser.Scene {
     this.modeText.setText(this.modeLabel());
     this.clearPending();
     this.ghost.clear();
+    this.clearBuffAreaGhost();
     this.ghostSprite?.setVisible(false);
     this.moveGhostSprite?.setVisible(false);
 
@@ -851,6 +897,97 @@ class MainScene extends Phaser.Scene {
       pointer.event.preventDefault?.();
       pointer.event.stopPropagation?.();
     }
+  }
+
+  clearBuffAreaGhost() {
+    this.hoverAuraBuildingId = null;
+    this.buffAreaGhost?.clear();
+  }
+
+  drawIsoAuraPolygon(centerR, centerC, radiusTiles) {
+    if (!this.buffAreaGhost || !Number.isFinite(centerR) || !Number.isFinite(centerC)) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+    const steps = 56;
+    const points = [];
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const rr = centerR + (Math.cos(a) * radiusTiles);
+      const cc = centerC + (Math.sin(a) * radiusTiles);
+      points.push(isoToScreen(rr, cc));
+    }
+
+    this.buffAreaGhost.clear();
+    this.buffAreaGhost.fillStyle(0x38bdf8, 0.12);
+    this.buffAreaGhost.beginPath();
+    this.buffAreaGhost.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      this.buffAreaGhost.lineTo(points[i].x, points[i].y);
+    }
+    this.buffAreaGhost.closePath();
+    this.buffAreaGhost.fillPath();
+    this.buffAreaGhost.lineStyle(2, 0x7dd3fc, 0.92);
+    this.buffAreaGhost.beginPath();
+    this.buffAreaGhost.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      this.buffAreaGhost.lineTo(points[i].x, points[i].y);
+    }
+    this.buffAreaGhost.closePath();
+    this.buffAreaGhost.strokePath();
+  }
+
+  drawBuffAreaGhostForBuilding(b) {
+    if (!this.buffAreaGhost || !this.isAuraSourceBuilding(b)) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+    const center = this.getBuildingGridCenter(b);
+    if (!center) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+
+    const aura = this.getDecorAuraFromLevel(b.evoLevel || 0);
+    this.drawIsoAuraPolygon(center.r, center.c, aura.radiusTiles);
+  }
+
+  drawBuffAreaGhostForPlacement(typeKey, r0, c0, size = 1, evoLevel = 0) {
+    if (!this.isDecorativeHouse(typeKey)) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+    const aura = this.getDecorAuraFromLevel(evoLevel || 0);
+    const centerR = r0 + ((Math.max(1, size) - 1) * 0.5);
+    const centerC = c0 + ((Math.max(1, size) - 1) * 0.5);
+    this.drawIsoAuraPolygon(centerR, centerC, aura.radiusTiles);
+  }
+
+  updateBuffAreaGhostFromPointer(pointer) {
+    if (!pointer) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+    if (this.hasBlockingDomOverlay() || pointer.y <= 140 || mode === "build" || this.moveMode) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+
+    const tile = screenToIsoTile(pointer.worldX, pointer.worldY);
+    if (!tile || !inBounds(tile.r, tile.c)) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+
+    const idOnTile = grid[tile.r][tile.c];
+    const b = idOnTile ? buildings.get(idOnTile) : null;
+    if (!this.isAuraSourceBuilding(b)) {
+      this.clearBuffAreaGhost();
+      return;
+    }
+
+    this.hoverAuraBuildingId = b.id;
+    this.drawBuffAreaGhostForBuilding(b);
   }
 
 
@@ -984,6 +1121,7 @@ class MainScene extends Phaser.Scene {
     this.pending = null;
     this.confirmOk.setVisible(false);
     this.confirmX.setVisible(false);
+    this.clearBuffAreaGhost();
     this.ghostSprite?.setVisible(false);
   }
 
@@ -1004,6 +1142,7 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.35, ok ? okBorder : badColor);
+    this.drawBuffAreaGhostForPlacement(preview.typeKey, tile.r, tile.c, size, 0);
     if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
       this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
     } else {
@@ -1138,6 +1277,106 @@ class MainScene extends Phaser.Scene {
     return null;
   }
 
+  isDecorativeHouse(typeKey) {
+    return typeKey === "green_1";
+  }
+
+  getDecorAuraFromLevel(level) {
+    const clamped = Math.max(0, Math.min(DECOR_AURA_MAX_LEVEL, level || 0));
+    const t = clamped / DECOR_AURA_MAX_LEVEL;
+    return {
+      level: clamped,
+      radiusTiles: DECOR_AURA_RADIUS_BASE_TILES + (DECOR_AURA_RADIUS_PER_LEVEL_TILES * clamped),
+      buildReduction: DECOR_AURA_BUILD_REDUCTION_MAX * t,
+      prodBoost: DECOR_AURA_PROD_BOOST_MAX * t
+    };
+  }
+
+  getBuildingGridCenter(b) {
+    if (!b?.cells?.length) return null;
+    let rSum = 0;
+    let cSum = 0;
+    for (const cell of b.cells) {
+      rSum += cell.r;
+      cSum += cell.c;
+    }
+    return {
+      r: rSum / b.cells.length,
+      c: cSum / b.cells.length
+    };
+  }
+
+  isAuraSourceBuilding(b) {
+    if (!b || !b.isBuilt) return false;
+    if (!this.isDecorativeHouse(b.typeKey)) return false;
+    return true;
+  }
+
+  hasBuildingProduction(b, def = null) {
+    if (b && typeof b.baseHasProduction === "boolean") return b.baseHasProduction;
+    const src = def || b || {};
+    const prodSeconds = src.prodSeconds ?? 0;
+    const reward = src.reward || { exp: 0, gold: 0 };
+    const rewardTotal = Math.max(0, reward.exp || 0) + Math.max(0, reward.gold || 0);
+    return prodSeconds > 0 && rewardTotal > 0;
+  }
+
+  getAreaBuffForBuilding(targetB) {
+    if (!targetB) {
+      return { buildMult: 1, prodMult: 1, stacks: 0, buildReductionPct: 0, prodBoostPct: 0 };
+    }
+    const targetCenter = this.getBuildingGridCenter(targetB);
+    if (!targetCenter) {
+      return { buildMult: 1, prodMult: 1, stacks: 0, buildReductionPct: 0, prodBoostPct: 0 };
+    }
+
+    const inRangeSources = [];
+    for (const source of buildings.values()) {
+      if (!this.isAuraSourceBuilding(source)) continue;
+      if (source.id === targetB.id) continue;
+
+      const sourceCenter = this.getBuildingGridCenter(source);
+      if (!sourceCenter) continue;
+
+      const aura = this.getDecorAuraFromLevel(source.evoLevel || 0);
+      if (aura.buildReduction <= 0 && aura.prodBoost <= 0) continue;
+
+      const dist = Math.hypot(sourceCenter.r - targetCenter.r, sourceCenter.c - targetCenter.c);
+      if (dist > aura.radiusTiles) continue;
+
+      inRangeSources.push({
+        dist,
+        power: aura.buildReduction + aura.prodBoost,
+        buildReduction: aura.buildReduction,
+        prodBoost: aura.prodBoost
+      });
+    }
+
+    inRangeSources.sort((a, b) => (b.power - a.power) || (a.dist - b.dist));
+    const used = inRangeSources.slice(0, DECOR_AURA_MAX_STACKS);
+
+    let totalBuildReduction = 0;
+    let totalProdBoost = 0;
+    for (const src of used) {
+      totalBuildReduction += src.buildReduction;
+      totalProdBoost += src.prodBoost;
+    }
+
+    return {
+      buildMult: Math.max(0.75, 1 - totalBuildReduction),
+      prodMult: Math.max(0.8, 1 - totalProdBoost),
+      stacks: used.length,
+      buildReductionPct: Math.round(totalBuildReduction * 100),
+      prodBoostPct: Math.round(totalProdBoost * 100)
+    };
+  }
+
+  recalculateAllBuildingStats(now = Date.now()) {
+    for (const b of buildings.values()) {
+      this.applyEvolution(b, now);
+    }
+  }
+
   buildEvoDiamonds(level) {
     const filled = Math.max(0, Math.min(5, level || 0));
     let html = `<div style="display:flex; gap:6px;">`;
@@ -1152,6 +1391,18 @@ class MainScene extends Phaser.Scene {
   getEvolutionStats(typeKey, stage, level) {
     const clampedLevel = Math.max(0, Math.min(5, level || 0));
     const baseRarity = this.getRarityForKey(typeKey);
+
+    if (this.isDecorativeHouse(typeKey)) {
+      const aura = this.getDecorAuraFromLevel(clampedLevel);
+      const buildPct = Math.round(aura.buildReduction * 100);
+      const prodPct = Math.round(aura.prodBoost * 100);
+      return {
+        buildMult: 1,
+        prodMult: 1,
+        rewardMult: 1,
+        bonusLabel: `Aura r${aura.radiusTiles.toFixed(1)} | Constr -${buildPct}% | Prod +${prodPct}%`
+      };
+    }
 
     if (baseRarity >= 1 && baseRarity <= 3) {
       const t = clampedLevel / 5;
@@ -1181,6 +1432,7 @@ class MainScene extends Phaser.Scene {
     const level = Math.max(0, Math.min(5, b.evoLevel || 0));
     const stage = (typeof b.evoStage === "number") ? b.evoStage : 5;
     const evoStats = this.getEvolutionStats(b.typeKey, stage, level);
+    const auraStats = this.getAreaBuffForBuilding(b);
 
     const prevBuild = b.buildSeconds ?? b.baseBuildSeconds ?? 0;
     const prevProd = b.prodSeconds ?? b.baseProdSeconds ?? 1;
@@ -1188,22 +1440,34 @@ class MainScene extends Phaser.Scene {
     const baseBuild = b.baseBuildSeconds ?? prevBuild;
     const baseProd = b.baseProdSeconds ?? prevProd;
     const baseReward = b.baseReward || b.reward || { exp: 0, gold: 0 };
+    const hasProduction = this.hasBuildingProduction(b, {
+      prodSeconds: baseProd,
+      reward: baseReward
+    });
 
-    b.buildSeconds = Math.max(0, Math.round(baseBuild * evoStats.buildMult));
-    b.prodSeconds = Math.max(1, Math.round(baseProd * evoStats.prodMult));
-    b.reward = {
-      exp: Math.max(0, Math.round(baseReward.exp * evoStats.rewardMult)),
-      gold: Math.max(0, Math.round(baseReward.gold * evoStats.rewardMult))
-    };
+    b.buildSeconds = Math.max(0, Math.round(baseBuild * evoStats.buildMult * auraStats.buildMult));
+    if (hasProduction) {
+      b.prodSeconds = Math.max(1, Math.round(baseProd * evoStats.prodMult * auraStats.prodMult));
+      b.reward = {
+        exp: Math.max(0, Math.round(baseReward.exp * evoStats.rewardMult)),
+        gold: Math.max(0, Math.round(baseReward.gold * evoStats.rewardMult))
+      };
+    } else {
+      b.prodSeconds = 0;
+      b.reward = { exp: 0, gold: 0 };
+      b.rewardReady = false;
+    }
+    b.hasProduction = hasProduction;
+    b.areaBuff = auraStats;
 
-    b.prodCycle = b.prodSeconds * 1000;
+    b.prodCycle = hasProduction ? (b.prodSeconds * 1000) : 0;
 
     if (!b.isBuilt) {
       const prevTotal = Math.max(1, prevBuild * 1000);
       const remain = Math.max(0, b.buildEnd - now);
       const ratio = remain / prevTotal;
       b.buildEnd = now + Math.round((b.buildSeconds * 1000) * ratio);
-    } else if (!b.rewardReady) {
+    } else if (hasProduction && !b.rewardReady) {
       const prevCycle = Math.max(1, prevProd * 1000);
       const elapsed = Math.max(0, now - b.prodStart);
       const ratio = elapsed / prevCycle;
@@ -1408,8 +1672,9 @@ class MainScene extends Phaser.Scene {
     this.setCursorMode();
     b.evoStage = 6;
     b.evoLevel = 0;
-    this.applyEvolution(b, Date.now());
-    if (def) this.updateBuildingInfoModal(b, def, Date.now());
+    const now = Date.now();
+    this.recalculateAllBuildingStats(now);
+    if (def) this.updateBuildingInfoModal(b, def, now);
   }
 
   openEvolutionModal(b) {
@@ -2036,12 +2301,19 @@ class MainScene extends Phaser.Scene {
     const evoTrans = modal.querySelector("#evoTrans");
     const evoSparkLayer = modal.querySelector("#evoSparkLayer");
     const evoWindow = modal.querySelector(".evo-window");
-    const evoSparkTarget = modal.querySelector("#evoTargetIcon");
+    // Usa un target visible y estable para evitar desvio de luces.
+    const evoSparkTarget = modal.querySelector("#evoFrame")
+      || modal.querySelector("#evoMainCard")
+      || modal.querySelector("#evoTargetIcon");
 
     const playEvoSparks = (pendingSlots) => {
       if (!evoSparkLayer || !evoWindow || !evoSparkTarget) return;
       const winRect = evoWindow.getBoundingClientRect();
-      const targetRect = evoSparkTarget.getBoundingClientRect();
+      let targetRect = evoSparkTarget.getBoundingClientRect();
+      if (!targetRect || targetRect.width <= 0 || targetRect.height <= 0) {
+        const fallbackTarget = modal.querySelector("#evoMainCard") || evoWindow;
+        targetRect = fallbackTarget.getBoundingClientRect();
+      }
       const tx = targetRect.left + targetRect.width / 2 - winRect.left;
       const ty = targetRect.top + targetRect.height / 2 - winRect.top;
 
@@ -2056,16 +2328,18 @@ class MainScene extends Phaser.Scene {
         evoSparkLayer.appendChild(spark);
         const dx = tx - sx;
         const dy = ty - sy;
-        const delay = i * 120;
+        const delay = i * 180;
+        const travel = Math.hypot(dx, dy);
+        const duration = Math.max(1250, Math.min(1900, Math.round(900 + (travel * 1.7))));
         const anim = spark.animate([
           { transform: "translate(0,0) scale(0.45)", opacity: 0 },
-          { transform: "translate(0,0) scale(1.25)", opacity: 1, offset: 0.18 },
-          { transform: `translate(${dx * 0.82}px, ${dy * 0.82}px) scale(1.06)`, opacity: 1, offset: 0.74 },
+          { transform: "translate(0,0) scale(1.18)", opacity: 1, offset: 0.22 },
+          { transform: `translate(${dx * 0.58}px, ${dy * 0.58}px) scale(1.02)`, opacity: 0.95, offset: 0.72 },
           { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0.05 }
         ], {
-          duration: 980,
+          duration,
           delay,
-          easing: "cubic-bezier(.16,.84,.22,1)"
+          easing: "cubic-bezier(.22,.61,.36,1)"
         });
         anim.onfinish = () => {
           spark.remove();
@@ -2285,8 +2559,9 @@ class MainScene extends Phaser.Scene {
           b.evoLevel = newLevel;
         }
 
-        this.applyEvolution(b, Date.now());
-        this.updateBuildingInfoModal(b, def, Date.now());
+        const now = Date.now();
+        this.recalculateAllBuildingStats(now);
+        this.updateBuildingInfoModal(b, def, now);
         this.openBuildingInfoModal(b.id);
 
         const pendingSlots = slots.filter((s) => s.dataset.pending === "1");
@@ -2383,13 +2658,19 @@ class MainScene extends Phaser.Scene {
       ? " chrome"
       : ((displayRarity >= 1 && displayRarity <= 4 && evoLevel >= 5) ? ` chrome-${displayRarity}` : "");
     const baseLabel = def.label || def.key;
+    const hasProduction = this.hasBuildingProduction(b, def);
     const displayLabel = (b.typeKey === "green_1")
-      ? "Casa Comun"
+      ? "Casa Decorativa"
       : baseLabel;
     const buildLabel = this.formatSeconds(b.buildSeconds ?? def.buildSeconds);
-    const prodLabel = this.formatSeconds(b.prodSeconds ?? def.prodSeconds);
+    const prodLabel = hasProduction
+      ? this.formatSeconds(b.prodSeconds ?? def.prodSeconds)
+      : "Sin produccion";
     const rewardGold = b.reward?.gold ?? def.reward?.gold ?? 0;
     const rewardExp = b.reward?.exp ?? def.reward?.exp ?? 0;
+    const rewardLine = hasProduction
+      ? `<div>Recompensa: <b>+${rewardGold} Oro</b>  |  <b>+${rewardExp} EXP</b></div>`
+      : `<div>Recompensa: <b>No produce recursos</b></div>`;
     const fillHex = this.colorToHex(def.fill);
     const borderHex = this.colorToHex(def.border);
     const previewContent = this.isSpriteBuilding(b.typeKey)
@@ -2661,7 +2942,7 @@ class MainScene extends Phaser.Scene {
           </div>
           <div>Construccion: <b>${buildLabel}</b></div>
           <div>Produccion: <b>${prodLabel}</b></div>
-          <div>Recompensa: <b>+${rewardGold} Oro</b>  |  <b>+${rewardExp} EXP</b></div>
+          ${rewardLine}
         </div>
 
         <div id="buildSection" style="margin-top:12px;">
@@ -2872,29 +3153,35 @@ class MainScene extends Phaser.Scene {
     }
 
     if (buildSection) buildSection.style.display = "none";
-    if (prodSection) prodSection.style.display = "block";
+    const hasProduction = this.hasBuildingProduction(b, def);
+    if (!hasProduction) {
+      if (prodSection) prodSection.style.display = "none";
+      if (collectBtn) collectBtn.setAttribute("disabled", "true");
+    } else {
+      if (prodSection) prodSection.style.display = "block";
 
-    const cycle = b.prodCycle;
-    let p01 = 1;
-    let remain = 0;
-    if (!b.rewardReady) {
-      const elapsed = now - b.prodStart;
-      if (cycle > 0) {
-        p01 = Phaser.Math.Clamp(elapsed / cycle, 0, 1);
-        remain = Math.max(0, cycle - elapsed);
+      const cycle = b.prodCycle;
+      let p01 = 1;
+      let remain = 0;
+      if (!b.rewardReady) {
+        const elapsed = now - b.prodStart;
+        if (cycle > 0) {
+          p01 = Phaser.Math.Clamp(elapsed / cycle, 0, 1);
+          remain = Math.max(0, cycle - elapsed);
+        }
       }
-    }
 
-    if (prodFill) prodFill.style.width = `${Math.floor(Phaser.Math.Clamp(p01, 0, 1) * 100)}%`;
-    if (prodTime) {
-      prodTime.textContent = b.rewardReady ? "Listo" : `${this.formatSeconds(Math.ceil(remain / 1000))} restante`;
-    }
+      if (prodFill) prodFill.style.width = `${Math.floor(Phaser.Math.Clamp(p01, 0, 1) * 100)}%`;
+      if (prodTime) {
+        prodTime.textContent = b.rewardReady ? "Listo" : `${this.formatSeconds(Math.ceil(remain / 1000))} restante`;
+      }
 
-    if (collectBtn) {
-      if (b.rewardReady) {
-        collectBtn.removeAttribute("disabled");
-      } else {
-        collectBtn.setAttribute("disabled", "true");
+      if (collectBtn) {
+        if (b.rewardReady) {
+          collectBtn.removeAttribute("disabled");
+        } else {
+          collectBtn.setAttribute("disabled", "true");
+        }
       }
     }
 
@@ -2989,7 +3276,8 @@ class MainScene extends Phaser.Scene {
       typeKey: b.typeKey,
       from: { r: min.r, c: min.c },
       border: b.border || 0x22c55e,
-      rotationStep: b.rotationStep || 0
+      rotationStep: b.rotationStep || 0,
+      evoLevel: b.evoLevel || 0
     };
 
     this.selectedBuildingId = null;
@@ -3001,6 +3289,7 @@ class MainScene extends Phaser.Scene {
     if (!this.moveMode) return;
     this.moveGhost.clear();
     if (!tile) {
+      this.clearBuffAreaGhost();
       this.moveGhostSprite?.setVisible(false);
       return;
     }
@@ -3015,6 +3304,13 @@ class MainScene extends Phaser.Scene {
       }
     }
     this.drawCells(this.moveGhost, cells, color, 0.35, color);
+    this.drawBuffAreaGhostForPlacement(
+      this.moveMode.typeKey,
+      tile.r,
+      tile.c,
+      this.moveMode.size,
+      this.moveMode.evoLevel || 0
+    );
     if (this.isSpriteBuilding(this.moveMode.typeKey) && this.moveMode.size === 1) {
       this.placeSpriteAtTile(this.moveGhostSprite, this.moveMode.typeKey, this.moveMode.rotationStep || 0, tile.r, tile.c, ok ? 0.56 : 0.42);
     } else {
@@ -3026,10 +3322,12 @@ class MainScene extends Phaser.Scene {
     const mm = this.moveMode;
     const b = buildings.get(mm.id);
     if (!b) return;
+    const now = Date.now();
 
     b.cells = occupy(mm.id, mm.size, r0, c0);
     b.rotationStep = mm.rotationStep;
     b.border = mm.border;
+    this.recalculateAllBuildingStats(now);
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     b.gfx.clear();
@@ -3052,6 +3350,7 @@ class MainScene extends Phaser.Scene {
     this.moveGhost.clear();
     this.moveGhostSprite?.setVisible(false);
     this.moveMode = null;
+    this.clearBuffAreaGhost();
     this.modeText.setText(this.modeLabel());
   }
 
@@ -3088,6 +3387,7 @@ class MainScene extends Phaser.Scene {
     this.moveGhost.clear();
     this.moveGhostSprite?.setVisible(false);
     this.moveMode = null;
+    this.clearBuffAreaGhost();
     this.modeText.setText(this.modeLabel());
   }
 
@@ -3116,11 +3416,14 @@ class MainScene extends Phaser.Scene {
     b.rewardExpIcon?.destroy();
     buildings.delete(id);
     freeBuilding(id);
+    this.recalculateAllBuildingStats(Date.now());
+    this.clearBuffAreaGhost();
   }
 
   collectBuildingReward(id) {
     const b = buildings.get(id);
     if (!b || !b.rewardReady) return;
+    if (!this.hasBuildingProduction(b)) return;
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     const reward = b.reward || def.reward || { exp: 0, gold: 0 };
@@ -3149,12 +3452,18 @@ class MainScene extends Phaser.Scene {
     const baseBuild = def.buildSeconds ?? 0;
     const baseProd = def.prodSeconds ?? 0;
     const baseReward = def.reward || { exp: 0, gold: 0 };
+    const hasProduction = this.hasBuildingProduction(null, {
+      prodSeconds: baseProd,
+      reward: baseReward
+    });
     const effBuild = Math.max(0, Math.round(baseBuild * mods.build));
-    const effProd = Math.max(1, Math.round(baseProd * mods.prod));
-    const effReward = {
-      exp: Math.max(0, Math.round(baseReward.exp * mods.reward)),
-      gold: Math.max(0, Math.round(baseReward.gold * mods.reward))
-    };
+    const effProd = hasProduction ? Math.max(1, Math.round(baseProd * mods.prod)) : 0;
+    const effReward = hasProduction
+      ? {
+        exp: Math.max(0, Math.round(baseReward.exp * mods.reward)),
+        gold: Math.max(0, Math.round(baseReward.gold * mods.reward))
+      }
+      : { exp: 0, gold: 0 };
 
     // validar espacio
     if (!canPlace(size, r0, c0)) return;
@@ -3243,7 +3552,7 @@ class MainScene extends Phaser.Scene {
     // tiempos
     const now = Date.now();
     const buildEnd = now + effBuild * 1000;
-    const prodCycle = effProd * 1000;
+    const prodCycle = hasProduction ? (effProd * 1000) : 0;
 
     buildings.set(id, {
       id,
@@ -3265,6 +3574,8 @@ class MainScene extends Phaser.Scene {
       baseBuildSeconds: effBuild,
       baseProdSeconds: effProd,
       baseReward: { ...effReward },
+      baseHasProduction: hasProduction,
+      hasProduction,
       evoLevel: 0,
       evoStage: (rarity >= 5) ? 5 : 0,
       buildEnd,
@@ -3276,6 +3587,7 @@ class MainScene extends Phaser.Scene {
     });
 
     const b = buildings.get(id);
+    if (b) this.applyEvolution(b, now);
     if (b?.sprite) {
       this.updateBuildingSpriteVisual(b, b.isBuilt ? 1 : 0.3);
       if (b.isBuilt) {
@@ -3354,7 +3666,7 @@ class MainScene extends Phaser.Scene {
     const anchorB = (origin.y - (TILE_H / 2)) + (slope * origin.x);
 
     const drawLineFamily = (target, m, anchor, alpha = 1) => {
-      target.lineStyle(1, 0x1e293b, alpha);
+      target.lineStyle(1, WORLD_BG_GRID_LINE_COLOR, alpha);
 
       const corners = [
         { x: x0, y: y0 },
@@ -3401,10 +3713,10 @@ class MainScene extends Phaser.Scene {
     // Background grid layer (world space, zooms with camera).
     const bg = this.bgGridGfx;
     bg.clear();
-    bg.fillStyle(0x020617, 1);
+    bg.fillStyle(WORLD_BG_GRASS_COLOR, 1);
     bg.fillRect(x0, y0, x1 - x0, y1 - y0);
-    drawLineFamily(bg, slope, anchorA, 0.45);
-    drawLineFamily(bg, -slope, anchorB, 0.45);
+    drawLineFamily(bg, slope, anchorA, 0.3);
+    drawLineFamily(bg, -slope, anchorB, 0.3);
 
     // Main playable grid (same phase as background, clamped to map).
     const xMin = viewX - TILE_W;
@@ -3430,12 +3742,12 @@ class MainScene extends Phaser.Scene {
 
     const g = this.gridGfx;
     g.clear();
-    g.lineStyle(1, 0x1e293b, 1);
+    g.lineStyle(1, WORLD_GRID_LINE_COLOR, 0.95);
 
     for (let r = rStart; r <= rEnd; r++) {
       for (let c = cStart; c <= cEnd; c++) {
         const p = isoToScreen(r, c);
-        this.drawDiamond(g, p.x, p.y, TILE_W, TILE_H, 0x020617, 1);
+        this.drawDiamond(g, p.x, p.y, TILE_W, TILE_H, WORLD_TILE_GRASS_COLOR, 1);
         this.outlineDiamond(g, p.x, p.y, TILE_W, TILE_H);
       }
     }
@@ -3451,7 +3763,7 @@ class MainScene extends Phaser.Scene {
     const vBottom = { x: bottomCenter.x, y: bottomCenter.y + TILE_H / 2 };
     const vLeft = { x: leftCenter.x - TILE_W / 2, y: leftCenter.y };
 
-    g.lineStyle(3, 0x60a5fa, 0.95);
+    g.lineStyle(3, WORLD_MAP_BORDER_COLOR, 0.95);
     g.beginPath(); g.moveTo(vTop.x, vTop.y); g.lineTo(vRight.x, vRight.y); g.strokePath();
     g.beginPath(); g.moveTo(vRight.x, vRight.y); g.lineTo(vBottom.x, vBottom.y); g.strokePath();
     g.beginPath(); g.moveTo(vBottom.x, vBottom.y); g.lineTo(vLeft.x, vLeft.y); g.strokePath();
@@ -3534,10 +3846,19 @@ class MainScene extends Phaser.Scene {
       }
 
       // ===== Produccion =====
-    const cycle = b.prodCycle;
-    let p01 = 0;
+      if (!this.hasBuildingProduction(b, def)) {
+        b.rewardReady = false;
+        b.prodBar.clear();
+        b.rewardGoldIcon?.setVisible(false);
+        b.rewardExpIcon?.setVisible(false);
+        this.updateBuildingInfoModal(b, def, now);
+        continue;
+      }
 
-    if (!b.rewardReady) {
+      const cycle = b.prodCycle;
+      let p01 = 0;
+
+      if (!b.rewardReady) {
         const elapsed = (now - b.prodStart);
         if (cycle <= 0) {
           p01 = 1;
