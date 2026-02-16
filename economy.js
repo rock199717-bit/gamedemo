@@ -13,6 +13,8 @@ const MAX_LEVEL = 150;
 const MAX_EXP_LABEL = "MAX.";
 const GACHA_BTN_TEXTURE_KEY = "ui_gachapon_btn";
 const GREEN_HOUSE_ICON_HTML = `<img src="img/green_casa1x1_normal.png" alt="Casa Decorativa" style="width:18px;height:auto;display:inline-block;vertical-align:middle;">`;
+const YAPA_WISH_COST_PERM = 150;
+const YAPA_WISH_COST_LIM = 150;
 
 // ===== ITEMS (lo que \u201Csale\u201D del gachapon / banner) =====
 const ITEM_DEFS = {
@@ -93,6 +95,15 @@ class EconomySystem {
 
     // ===== Valores base =====
     this.gold = 1000;
+    this.yapas = 0;
+    this.yapaSpentTotal = 0;
+    this.yapaMovements = [];
+    this.yapaWishMovements = [];
+    this.yapaUsedCodes = Object.create(null);
+    this.yapaShowBalance = false;
+    this.yapaShowMovements = false;
+    this.yapaWishViewOpen = false;
+    this.yapaClockTimer = null;
 
     this.level = 1;
     this.exp = 0;
@@ -128,6 +139,7 @@ class EconomySystem {
     this.refreshUI();
     this.ensureInventoryButton();
     this.ensureAdminButton();
+    this.ensureYapaButton();
 
     // ===== Banner Permanente: sin barra de carga (se quit\u00F3 el ciclo) =====
   }
@@ -278,6 +290,8 @@ class EconomySystem {
       "gacha-anim-overlay",
       "inventory-modal",
       "admin-modal",
+      "yapa-modal",
+      "yapa-qr-modal",
       "building-modal",
       "evo-modal"
     ];
@@ -316,6 +330,15 @@ class EconomySystem {
     return String(n);
   }
 
+  formatYapaHUD(value) {
+    const compactM = this.formatCompactValue(value, 1_000_000, "M");
+    if (compactM) return compactM;
+    const compactK = this.formatCompactValue(value, 1_000, "K");
+    if (compactK) return compactK;
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    return String(n);
+  }
+
   // =========================
   // UI
   // =========================
@@ -341,6 +364,695 @@ class EconomySystem {
     document.body.appendChild(btn);
   }
 
+  ensureYapaButton() {
+    if (document.getElementById("yapaBtn")) return;
+
+    const host = document.getElementById("game") || document.body;
+    const rail = document.createElement("div");
+    rail.id = "yapaRail";
+    rail.className = "yapa-rail";
+
+    const btn = document.createElement("button");
+    btn.id = "yapaBtn";
+    btn.className = "yapa-btn";
+    btn.setAttribute("aria-label", "Abrir Yapa");
+    btn.innerHTML = `
+      <img class="yapa-btn-art" src="img/yapa.png" alt="Yapa">
+    `;
+    btn.addEventListener("click", () => {
+      if (this.hasBlockingOverlayOpen()) return;
+      this.openYapaModal();
+    });
+
+    const timer = document.createElement("div");
+    timer.id = "yapaRailTimer";
+    timer.className = "yapa-rail-timer";
+    timer.textContent = "Bono: --:--";
+
+    rail.appendChild(btn);
+    rail.appendChild(timer);
+    host.appendChild(rail);
+
+    this.positionYapaRail();
+    if (!this._boundYapaRailReflow) {
+      this._boundYapaRailReflow = () => this.positionYapaRail();
+      window.addEventListener("resize", this._boundYapaRailReflow);
+      this.scene?.scale?.on?.("resize", this._boundYapaRailReflow);
+    }
+    setTimeout(() => this.positionYapaRail(), 0);
+    this.updateYapaRailTimer();
+    if (!this._yapaRailTimerInt) {
+      this._yapaRailTimerInt = setInterval(() => this.updateYapaRailTimer(), 1000);
+    }
+  }
+
+  positionYapaRail() {
+    const rail = document.getElementById("yapaRail");
+    const host = document.getElementById("game");
+    const canvas = this.scene?.game?.canvas;
+    if (!rail || !host || !canvas) return;
+
+    const hostRect = host.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+
+    const baseW = Number(this.scene?.game?.config?.width) || 1920;
+    const scale = Math.max(0.3, canvasRect.width / baseW);
+
+    const desiredLeft = Math.round((canvasRect.left - hostRect.left) + (14 * scale));
+    const desiredTop = Math.round((canvasRect.top - hostRect.top) + (180 * scale));
+
+    const maxLeft = Math.max(8, Math.round(host.clientWidth - rail.offsetWidth - 8));
+    const maxTop = Math.max(8, Math.round(host.clientHeight - rail.offsetHeight - 8));
+
+    rail.style.left = `${Phaser.Math.Clamp(desiredLeft, 8, maxLeft)}px`;
+    rail.style.top = `${Phaser.Math.Clamp(desiredTop, 8, maxTop)}px`;
+  }
+
+  formatYapaMoney(value) {
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    return `S/.${n}`;
+  }
+
+  formatYapaMovementTimeLabel(ts) {
+    const d = new Date(Number(ts) || Date.now());
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+
+    let timeText = d
+      .toLocaleTimeString("es-PE", { hour: "numeric", minute: "2-digit", hour12: true })
+      .replace(/\./g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+    timeText = timeText.replace(/\b([ap])\s*m\b/g, "$1m");
+
+    if (sameDay) return `Hoy ${timeText}`;
+
+    const dateText = d
+      .toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })
+      .replace(/\./g, "");
+    return `${dateText} - ${timeText}`;
+  }
+
+  recordYapaMovement(amount, detail = "", kind = "") {
+    const v = Math.round(Number(amount) || 0);
+    if (v === 0) return;
+    const now = new Date();
+    const entry = {
+      amount: v,
+      detail: String(detail || "Usuario"),
+      kind: String(kind || (v > 0 ? "in" : "out")),
+      ts: now.getTime(),
+      timeLabel: this.formatYapaMovementTimeLabel(now.getTime())
+    };
+    this.yapaMovements.unshift(entry);
+    if (this.yapaMovements.length > 24) this.yapaMovements.length = 24;
+    if (v < 0) this.yapaSpentTotal += Math.abs(v);
+  }
+
+  spendYapas(v, detail = "Usuario") {
+    const amount = Math.max(0, Math.round(Number(v) || 0));
+    if (amount <= 0) return false;
+    if (this.yapas < amount) return false;
+    this.yapas -= amount;
+    this.recordYapaMovement(-amount, detail, "out");
+    this.refreshUI();
+    this.updateModalCounts();
+    return true;
+  }
+
+  recordYapaWishMovement(direction = "in", label = "Deseo", qty = 1) {
+    const dir = direction === "out" ? "out" : "in";
+    const amount = Math.max(1, Math.round(Number(qty) || 1));
+    const now = Date.now();
+    this.yapaWishMovements.unshift({
+      direction: dir,
+      label: String(label || "Deseo"),
+      qty: amount,
+      ts: now,
+      timeLabel: this.formatYapaMovementTimeLabel(now)
+    });
+    if (this.yapaWishMovements.length > 40) this.yapaWishMovements.length = 40;
+  }
+
+  buyWishWithYapa(type = "perm") {
+    const isLimited = type === "lim";
+    const cost = isLimited ? YAPA_WISH_COST_LIM : YAPA_WISH_COST_PERM;
+    const label = isLimited ? "Deseo Limitado" : "Deseo Permanente";
+
+    const ok = this.spendYapas(cost, "Deseos Yapa");
+    if (!ok) return { ok: false, reason: "funds" };
+
+    if (isLimited) this.addLimitedWishes(1);
+    else this.addPermanentWishes(1);
+
+    this.recordYapaWishMovement("in", label, 1);
+    this.renderYapaModalData();
+    return { ok: true, label, cost };
+  }
+
+  redeemYapaWishCode(rawCode = "") {
+    const code = String(rawCode || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!code) return { ok: false, reason: "empty" };
+    if (code.length < 4) return { ok: false, reason: "short" };
+    if (this.yapaUsedCodes[code]) return { ok: false, reason: "used" };
+
+    this.yapaUsedCodes[code] = true;
+
+    let hash = 0;
+    for (let i = 0; i < code.length; i++) {
+      hash = ((hash * 31) + code.charCodeAt(i)) >>> 0;
+    }
+    const qty = 1 + (hash % 3);
+    const isLimited = (hash % 2) === 1;
+
+    if (isLimited) this.addLimitedWishes(qty);
+    else this.addPermanentWishes(qty);
+
+    this.recordYapaWishMovement("in", "YAPADESEO", qty);
+    this.renderYapaModalData();
+    return { ok: true, qty, type: isLimited ? "lim" : "perm" };
+  }
+
+  setYapaWishView(open, modal) {
+    this.yapaWishViewOpen = !!open;
+    const root = modal || document.getElementById("yapa-modal");
+    if (!root) return;
+    root.classList.toggle("yapa-wish-open", this.yapaWishViewOpen);
+    this.renderYapaModalData();
+  }
+
+  openYapaModal() {
+    if (document.getElementById("yapa-modal")) return;
+    this.yapaShowMovements = false;
+    this.yapaWishViewOpen = false;
+
+    const modal = document.createElement("div");
+    modal.id = "yapa-modal";
+    modal.className = "inv-modal";
+    modal.innerHTML = `
+      <div class="yapa-card yapa-phone-shell">
+        <div class="yapa-phone">
+          <div class="yapa-statusbar">
+            <span id="yapaClock">--:--</span>
+            <span id="yapaDate" class="yapa-status-date">--/--/----</span>
+            <span class="yapa-net-pill">4G</span>
+          </div>
+
+          <div class="yapa-head">
+            <div class="yapa-head-left">
+              <span>Hola <b class="yapa-badge">Gratis</b></span>
+            </div>
+            <div class="yapa-head-right">
+              <span class="yapa-top-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0"></path><path d="M5 12v4a2 2 0 0 0 2 2h1v-6H7a2 2 0 0 0-2 2z"></path><path d="M19 12v4a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2z"></path></svg></span>
+              <span class="yapa-top-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a4 4 0 0 1 4 4v2.6l1.3 1.6a1 1 0 0 1-.8 1.8H7.5a1 1 0 0 1-.8-1.8L8 11.6V9a4 4 0 0 1 4-4z"></path><path d="M10.3 16.7a1.8 1.8 0 0 0 3.4 0"></path></svg></span>
+            </div>
+            <button id="yapaClose" class="inv-x yapa-close">X</button>
+          </div>
+
+          <div class="yapa-scroll">
+            <div class="yapa-shortcuts">
+              <button class="yapa-shortcut is-main" data-yapa-note="Recargar celular">
+                <span class="yapa-shortcut-icon icon-recharge"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="2.7" width="12.2" height="18.4" rx="3" fill="#9b8cff"></rect><rect x="6.5" y="4.1" width="9.6" height="12.6" rx="2.1" fill="#7c64f8"></rect><circle cx="11.3" cy="18.3" r="1.1" fill="#efe9ff"></circle><circle cx="17.2" cy="8.5" r="4.1" fill="#2dd4bf"></circle><text x="17.2" y="9.8" text-anchor="middle" font-size="3.8" font-weight="800" fill="#0f766e">S/</text></svg></span>
+                <span>Recargar<br>celular</span>
+              </button>
+              <button class="yapa-shortcut is-main" data-yapa-note="Yapear servicios">
+                <span class="yapa-shortcut-icon icon-services"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 4.5C6 7.3 4.7 10 4.7 12a4.6 4.6 0 0 0 9.2 0c0-2-1.3-4.7-3.6-7.5z" fill="#60a5fa"></path><circle cx="17.2" cy="13.6" r="4.1" fill="#fbbf24"></circle><ellipse cx="17.2" cy="14" rx="1.6" ry="1.8" fill="#fef3c7"></ellipse><rect x="16.8" y="10.8" width="0.8" height="2.8" rx="0.4" fill="#92400e"></rect><rect x="16.8" y="15.3" width="0.8" height="1.4" rx="0.4" fill="#92400e"></rect></svg></span>
+                <span>Yapear<br>servicios</span>
+              </button>
+              <button class="yapa-shortcut" data-yapa-note="Creditos">
+                <span class="yapa-shortcut-icon icon-credit"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.1" y="5.4" width="17.8" height="13.2" rx="2.8" fill="#c3f1df"></rect><rect x="3.1" y="7.8" width="17.8" height="2.3" fill="#8de0bc"></rect><rect x="5.4" y="11.2" width="7.8" height="4.1" rx="1.3" fill="#53c48f"></rect><text x="16.1" y="14.4" text-anchor="middle" font-size="4.4" font-weight="800" fill="#0f766e">S/</text></svg></span>
+                <span>Creditos</span>
+              </button>
+              <button class="yapa-shortcut is-main" data-yapa-note="Aprobar compras">
+                <span class="yapa-shortcut-icon icon-approve"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8.2h12v8.9a2.5 2.5 0 0 1-2.5 2.5h-7a2.5 2.5 0 0 1-2.5-2.5z" fill="#cfc3ff"></path><path d="M8.4 8.2a3.6 3.6 0 0 1 7.2 0" fill="none" stroke="#8b5cf6" stroke-width="1.4" stroke-linecap="round"></path><circle cx="17.6" cy="15.8" r="4" fill="#34d399"></circle><path d="M15.9 15.8l1.2 1.2 2.1-2.2" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+                <span>Aprobar<br>compras</span>
+              </button>
+              <button class="yapa-shortcut" data-yapa-note="Promos">
+                <span class="yapa-shortcut-icon icon-promo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4l2.2 1.4 2.6-.2 1 2.4 2.1 1.5-.8 2.5.8 2.5-2.1 1.5-1 2.4-2.6-.2L12 20.6l-2.2-1.4-2.6.2-1-2.4-2.1-1.5.8-2.5-.8-2.5 2.1-1.5 1-2.4 2.6.2z" fill="#fbbf24"></path><path d="M9 15l6-6" stroke="#7c2d12" stroke-width="1.5" stroke-linecap="round"></path><circle cx="9" cy="9" r="1.1" fill="#7c2d12"></circle><circle cx="15" cy="15" r="1.1" fill="#7c2d12"></circle></svg></span>
+                <span>Promos</span>
+              </button>
+              <button class="yapa-shortcut" data-yapa-note="Tienda">
+                <span class="yapa-shortcut-icon icon-store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.1 8.3h15.8l-1.3 3.2a2.1 2.1 0 0 1-2 1.3H7.4a2.1 2.1 0 0 1-2-1.3z" fill="#9d7bf7"></path><rect x="5.6" y="12.7" width="12.8" height="6.9" rx="1.6" fill="#ccbdfd"></rect><rect x="8" y="14.2" width="3.4" height="5.4" rx="0.8" fill="#9d7bf7"></rect><rect x="12.8" y="14.3" width="3.8" height="2.4" rx="0.8" fill="#a78bfa"></rect></svg></span>
+                <span>Tienda</span>
+              </button>
+              <button id="yapaShortcutWishes" class="yapa-shortcut" data-yapa-note="Deseos">
+                <span class="yapa-shortcut-icon icon-wishes">
+                  <img class="wish-cycle wish-perm" src="img/deseoperma.png" alt="Deseo permanente">
+                  <img class="wish-cycle wish-lim" src="img/deseolimi.png" alt="Deseo limitado">
+                </span>
+                <span>Deseos</span>
+              </button>
+              <button class="yapa-shortcut" data-yapa-note="Ver todo">
+                <span class="yapa-shortcut-icon icon-more"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2" fill="#e9d5ff"></circle><rect x="11" y="7.1" width="2" height="9.8" rx="1" fill="#7c3aed"></rect><rect x="7.1" y="11" width="9.8" height="2" rx="1" fill="#7c3aed"></rect></svg></span>
+                <span>Ver todo</span>
+              </button>
+            </div>
+
+            <div class="yapa-promo">
+              <div id="yapaPromoChip" class="yapa-promo-chip"></div>
+              <div id="yapaPromoTitle" class="yapa-promo-title"></div>
+            </div>
+
+            <div class="yapa-panel">
+              <div class="yapa-toggle-panel">
+              <button id="yapaToggleBalance" class="yapa-toggle-row" type="button">
+                  <span class="yapa-toggle-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12s3.2-5.3 9.2-5.3 9.2 5.3 9.2 5.3-3.2 5.3-9.2 5.3-9.2-5.3-9.2-5.3z"></path><circle cx="12" cy="12" r="2.4"></circle></svg>
+                  </span>
+                  <span id="yapaToggleBalanceText">Mostrar saldo</span>
+                  <span id="yapaToggleBalanceValue" class="yapa-inline-balance">${this.formatYapaMoney(this.yapas)}</span>
+              </button>
+              <button id="yapaToggleMoves" class="yapa-toggle-row" type="button">
+                  <span class="yapa-toggle-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="15" rx="2.2"></rect><path d="M8.5 9h7M8.5 12h7M8.5 15h5"></path></svg>
+                  </span>
+                  <span id="yapaToggleMovesText">Ocultar movimientos</span>
+                  <span id="yapaToggleMovesArrow" class="yapa-toggle-arrow">^</span>
+              </button>
+              </div>
+
+              <div class="yapa-stats">
+                <div class="yapa-stat">
+                  <span>Total gastado</span>
+                  <b id="yapaSpent">${this.formatYapaMoney(this.yapaSpentTotal)}</b>
+                </div>
+                <div class="yapa-stat">
+                  <span>Movimientos</span>
+                  <b id="yapaMovesCount">${this.yapaMovements.length}</b>
+                </div>
+              </div>
+
+              <div class="yapa-list-wrap">
+                <div class="yapa-list-title">Movimientos</div>
+                <div id="yapaMoves" class="yapa-list"></div>
+              </div>
+            </div>
+
+            <div id="yapaWishSection" class="yapa-wish-section">
+              <div class="yapa-wish-head">
+                <button id="yapaWishBack" class="yapa-wish-back" type="button">\u2190</button>
+                <b>Yapa Deseos</b>
+              </div>
+              <div class="yapa-wish-balance-card">
+                <div id="yapaWishBalanceValue" class="yapa-wish-balance-value">${this.formatYapaMoney(this.yapas)}</div>
+                <div class="yapa-wish-balance-label">Saldo disponible</div>
+              </div>
+              <div class="yapa-wish-actions">
+                <button id="yapaBuyLimWishBtn" class="yapa-wish-action" type="button" data-yapa-note="Cambiar Deseo Limitado">
+                  Cambiar Deseo Limitado
+                  <small>S/.${YAPA_WISH_COST_LIM}</small>
+                </button>
+                <button id="yapaBuyPermWishBtn" class="yapa-wish-action" type="button" data-yapa-note="Cambiar Deseo Permanente">
+                  Cambiar Deseo Permanente
+                  <small>S/.${YAPA_WISH_COST_PERM}</small>
+                </button>
+                <button id="yapaRedeemWishCodeBtn" class="yapa-wish-action is-code" type="button" data-yapa-note="Canjear Codigo">
+                  Canjear Codigo
+                </button>
+              </div>
+              <input id="yapaWishCodeInput" class="yapa-wish-code-input" type="text" maxlength="24" placeholder="Ingresa codigo de deseos" />
+              <div id="yapaWishHint" class="yapa-wish-hint">Toca un boton para gestionar deseos.</div>
+              <div class="yapa-wish-history-wrap">
+                <div class="yapa-wish-history-title">Historial de Cuenta</div>
+                <div id="yapaWishMoves" class="yapa-wish-history-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="yapa-bottom">
+            <button id="yapaScanQrBtn" class="yapa-cta yapa-cta-outline" data-yapa-note="Escanear QR">ESCANEAR QR</button>
+            <button id="yapaYaparBtn" class="yapa-cta yapa-cta-fill" data-yapa-note="YAPAR">YAPAR</button>
+            <div id="yapaBonusTimer" class="yapa-bonus-timer">Bono Yapa: sin señal</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => this.closeYapaModal();
+    modal.querySelector("#yapaClose")?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) close();
+    });
+
+    modal.querySelector("#yapaToggleBalance")?.addEventListener("click", () => {
+      this.yapaShowBalance = !this.yapaShowBalance;
+      this.renderYapaModalData();
+    });
+    modal.querySelector("#yapaToggleMoves")?.addEventListener("click", () => {
+      this.yapaShowMovements = !this.yapaShowMovements;
+      this.renderYapaModalData();
+    });
+
+    modal.querySelectorAll("[data-yapa-note]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.remove("shake");
+        void btn.offsetWidth;
+        btn.classList.add("shake");
+      });
+    });
+
+    modal.querySelector("#yapaScanQrBtn")?.addEventListener("click", () => {
+      this.handleYapaScanQr(modal);
+    });
+
+    modal.querySelector("#yapaShortcutWishes")?.addEventListener("click", () => {
+      this.setYapaWishView(true, modal);
+    });
+
+    modal.querySelector("#yapaWishBack")?.addEventListener("click", () => {
+      this.setYapaWishView(false, modal);
+    });
+
+    modal.querySelector("#yapaBuyLimWishBtn")?.addEventListener("click", () => {
+      const res = this.buyWishWithYapa("lim");
+      const hint = modal.querySelector("#yapaWishHint");
+      if (!hint) return;
+      if (!res.ok) {
+        hint.textContent = "No tienes saldo suficiente para Deseo Limitado.";
+        hint.classList.add("error");
+        return;
+      }
+      hint.textContent = `Compraste 1 Deseo Limitado por ${this.formatYapaMoney(res.cost)}.`;
+      hint.classList.remove("error");
+    });
+
+    modal.querySelector("#yapaBuyPermWishBtn")?.addEventListener("click", () => {
+      const res = this.buyWishWithYapa("perm");
+      const hint = modal.querySelector("#yapaWishHint");
+      if (!hint) return;
+      if (!res.ok) {
+        hint.textContent = "No tienes saldo suficiente para Deseo Permanente.";
+        hint.classList.add("error");
+        return;
+      }
+      hint.textContent = `Compraste 1 Deseo Permanente por ${this.formatYapaMoney(res.cost)}.`;
+      hint.classList.remove("error");
+    });
+
+    modal.querySelector("#yapaRedeemWishCodeBtn")?.addEventListener("click", () => {
+      const input = modal.querySelector("#yapaWishCodeInput");
+      const code = input?.value || "";
+      const res = this.redeemYapaWishCode(code);
+      const hint = modal.querySelector("#yapaWishHint");
+      if (!hint) return;
+      if (!res.ok) {
+        const msg = res.reason === "used"
+          ? "Ese codigo ya fue canjeado."
+          : (res.reason === "short" ? "Codigo invalido (minimo 4 caracteres)." : "Ingresa un codigo valido.");
+        hint.textContent = msg;
+        hint.classList.add("error");
+        return;
+      }
+      const wishLabel = res.type === "lim" ? "Deseo Limitado" : "Deseo Permanente";
+      hint.textContent = `Codigo canjeado: +${res.qty} ${wishLabel} (YAPADESEO).`;
+      hint.classList.remove("error");
+      if (input) input.value = "";
+    });
+
+    this.renderYapaModalData();
+    this.updateYapaClock(modal);
+    this.updateYapaBonusStatus(modal);
+    this.yapaClockTimer = setInterval(() => {
+      this.updateYapaClock(modal);
+      this.updateYapaBonusStatus(modal);
+      this.updateYapaRailTimer();
+    }, 1000);
+  }
+
+  closeYapaModal() {
+    this.yapaWishViewOpen = false;
+    if (this.yapaClockTimer) {
+      clearInterval(this.yapaClockTimer);
+      this.yapaClockTimer = null;
+    }
+    const modal = document.getElementById("yapa-modal");
+    if (modal?.parentNode) modal.remove();
+  }
+  updateYapaClock(modal) {
+    if (!modal || !modal.isConnected) return;
+    const now = new Date();
+    const clockEl = modal.querySelector("#yapaClock");
+    const dateEl = modal.querySelector("#yapaDate");
+    const locale = (navigator && navigator.language) || "es-PE";
+    const timeText = new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(now);
+
+    const parts = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    }).formatToParts(now);
+    const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+    const wd = String(p.weekday || "").replace(/[.,]/g, "").toLowerCase();
+    const dd = String(p.day || "").trim();
+    const mm = String(p.month || "").replace(/[.,]/g, "").toLowerCase();
+    const dateText = (wd && dd && mm)
+      ? `${wd} ${dd} ${mm}`
+      : new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit" }).format(now);
+
+    if (clockEl) clockEl.textContent = timeText;
+    if (dateEl) dateEl.textContent = dateText;
+  }
+
+  formatCountdownMs(ms) {
+    const total = Math.max(0, Math.ceil((Number(ms) || 0) / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  updateYapaBonusStatus(modal) {
+    const root = modal || document.getElementById("yapa-modal");
+    if (!root) return;
+    const timerEl = root.querySelector("#yapaBonusTimer");
+    if (!timerEl) return;
+
+    const status = this.scene?.getYapaBonusStatus?.(Date.now());
+    if (!status || !status.active) {
+      timerEl.textContent = "Bono Yapa: sin señal";
+      timerEl.classList.remove("active");
+      return;
+    }
+
+    timerEl.textContent = `Bono Yapa (${status.label}): ${this.formatCountdownMs(status.remainMs)}`;
+    timerEl.classList.add("active");
+  }
+
+  updateYapaRailTimer() {
+    const timerEl = document.getElementById("yapaRailTimer");
+    if (!timerEl) return;
+    const status = this.scene?.getYapaBonusStatus?.(Date.now());
+    if (this.scene?.yapaScanMode && status?.active) {
+      timerEl.textContent = `Escanea: ${this.formatCountdownMs(status.remainMs)}`;
+      timerEl.classList.add("active");
+      return;
+    }
+    if (!status || !status.active) {
+      timerEl.textContent = "Bono: --:--";
+      timerEl.classList.remove("active");
+      return;
+    }
+    timerEl.textContent = `Bono: ${this.formatCountdownMs(status.remainMs)}`;
+    timerEl.classList.add("active");
+  }
+
+  buildFakeQrCells(size = 19) {
+    const side = Math.max(11, Math.min(29, size | 0));
+    const finder = (x, y) => (
+      ((x < 5 && y < 5) || (x > side - 6 && y < 5) || (x < 5 && y > side - 6))
+    );
+
+    const cells = [];
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < side; x++) {
+        let on = Math.random() < 0.46;
+        if (finder(x, y)) {
+          const lx = (x % (side - 1)) % 5;
+          const ly = (y % (side - 1)) % 5;
+          on = (lx === 0 || ly === 0 || lx === 4 || ly === 4 || (lx >= 1 && lx <= 3 && ly >= 1 && ly <= 3));
+        }
+        cells.push(`<span class="yapa-qr-cell${on ? " on" : ""}"></span>`);
+      }
+    }
+    return { side, html: cells.join("") };
+  }
+
+  openYapaQrModal(payload) {
+    if (!payload) return;
+    const old = document.getElementById("yapa-qr-modal");
+    if (old) old.remove();
+
+    const amount = Math.max(5, Math.min(10, Number(payload.amount) || 5));
+    const qr = this.buildFakeQrCells(19);
+    const ticket = `BY-${Math.floor(Math.random() * 900000 + 100000)}`;
+
+    const modal = document.createElement("div");
+    modal.id = "yapa-qr-modal";
+    modal.className = "inv-modal";
+    modal.innerHTML = `
+      <div class="yapa-qr-card">
+        <div class="yapa-qr-head">
+          <b>Bono Yapa</b>
+          <button id="yapaQrClose" class="inv-x">X</button>
+        </div>
+        <div class="yapa-qr-sub">Casa detectada: <b>${payload.label || "Casa"}</b></div>
+        <div class="yapa-qr-wrap">
+          <div class="yapa-qr-grid" style="--qr-size:${qr.side};">${qr.html}</div>
+        </div>
+        <div class="yapa-qr-code">${ticket}</div>
+        <div class="yapa-qr-reward">Escaneo listo: <b>+${amount} Yapa</b></div>
+        <button id="yapaQrClaim" class="yapa-qr-claim">Cobrar Bono Yapa</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = () => {
+      if (modal.parentNode) modal.remove();
+    };
+    modal.querySelector("#yapaQrClose")?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) close();
+    });
+    modal.querySelector("#yapaQrClaim")?.addEventListener("click", () => {
+      const ok = this.scene?.claimYapaBonusFromQr?.(payload.buildingId);
+      if (!ok) {
+        close();
+        this.updateYapaBonusStatus(document.getElementById("yapa-modal"));
+        this.updateYapaRailTimer();
+        return;
+      }
+      this.addYapas(amount, "Bono Yapa", "in");
+      close();
+      this.updateYapaBonusStatus(document.getElementById("yapa-modal"));
+      this.updateYapaRailTimer();
+    });
+  }
+
+  handleYapaScanQr(modal) {
+    const scene = this.scene;
+    if (!scene) return;
+
+    const status = scene.getYapaBonusStatus?.(Date.now());
+    if (!status?.active) {
+      this.updateYapaBonusStatus(modal);
+      this.updateYapaRailTimer();
+      return;
+    }
+    this.closeYapaModal();
+    const started = scene.startYapaScanMode?.();
+    if (started) {
+      scene.focusCameraOnBuilding?.(status.buildingId, 760);
+    }
+    this.updateYapaRailTimer();
+  }
+
+  renderYapaModalData() {
+    const modal = document.getElementById("yapa-modal");
+    if (!modal) return;
+    modal.classList.toggle("yapa-wish-open", !!this.yapaWishViewOpen);
+
+    const balanceEl = modal.querySelector("#yapaToggleBalanceValue");
+    const spentEl = modal.querySelector("#yapaSpent");
+    const movesCountEl = modal.querySelector("#yapaMovesCount");
+    const movesEl = modal.querySelector("#yapaMoves");
+    const toggleBalTextEl = modal.querySelector("#yapaToggleBalanceText");
+    const toggleMovesTextEl = modal.querySelector("#yapaToggleMovesText");
+    const toggleMovesArrowEl = modal.querySelector("#yapaToggleMovesArrow");
+    const listWrapEl = modal.querySelector(".yapa-list-wrap");
+    const wishBalanceEl = modal.querySelector("#yapaWishBalanceValue");
+    const wishMovesEl = modal.querySelector("#yapaWishMoves");
+
+    if (balanceEl) {
+      balanceEl.textContent = this.yapaShowBalance
+        ? this.formatYapaMoney(this.yapas)
+        : "*** ***";
+    }
+    if (spentEl) spentEl.textContent = this.formatYapaMoney(this.yapaSpentTotal);
+    if (movesCountEl) movesCountEl.textContent = String(this.yapaMovements.length);
+
+    if (toggleBalTextEl) {
+      toggleBalTextEl.textContent = this.yapaShowBalance
+        ? "Ocultar saldo"
+        : "Mostrar saldo";
+    }
+    if (toggleMovesTextEl) {
+      toggleMovesTextEl.textContent = this.yapaShowMovements
+        ? "Ocultar movimientos"
+        : "Mostrar movimientos";
+    }
+    if (toggleMovesArrowEl) {
+      toggleMovesArrowEl.textContent = this.yapaShowMovements ? "^" : "v";
+    }
+    if (listWrapEl) {
+      listWrapEl.style.display = this.yapaShowMovements ? "block" : "none";
+    }
+    if (wishBalanceEl) {
+      wishBalanceEl.textContent = this.formatYapaMoney(this.yapas);
+    }
+
+    if (movesEl) {
+      if (!this.yapaShowMovements) {
+        movesEl.innerHTML = "";
+      } else if (!this.yapaMovements.length) {
+        movesEl.innerHTML = `<div class="yapa-move empty">Aun no hay movimientos.</div>`;
+      } else {
+        movesEl.innerHTML = this.yapaMovements.map((m) => {
+          const out = m.amount < 0;
+          const rawDetail = String(m.detail || "").replace(/^Nombre:\s*/i, "").trim();
+          const detailText = /admin/i.test(rawDetail)
+            ? "Admin"
+            : (/usuario/i.test(rawDetail) ? "Usuario" : (rawDetail || "Usuario"));
+          const val = out
+            ? `- ${this.formatYapaMoney(Math.abs(m.amount))}`
+            : `${this.formatYapaMoney(Math.abs(m.amount))}`;
+          return `
+            <div class="yapa-move ${out ? "out" : "in"}">
+              <div class="yapa-move-left">
+                <div class="yapa-move-detail">${detailText}</div>
+                <div class="yapa-move-time">${m.timeLabel}</div>
+              </div>
+              <div class="yapa-move-amount">${val}</div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    if (wishMovesEl) {
+      if (!this.yapaWishMovements.length) {
+        wishMovesEl.innerHTML = `<div class="yapa-wish-move empty">Aun no hay movimientos de deseos.</div>`;
+      } else {
+        wishMovesEl.innerHTML = this.yapaWishMovements.map((m) => {
+          const isOut = m.direction === "out";
+          const arrow = isOut ? "\u2191" : "\u2193";
+          const moveType = isOut ? "out" : "in";
+          const label = String(m.label || "Deseo");
+          const qty = `x${Math.max(1, Number(m.qty) || 1)}`;
+          return `
+            <div class="yapa-wish-move ${moveType}">
+              <div class="yapa-wish-move-left">
+                <div class="yapa-wish-move-detail">${arrow} ${label}</div>
+                <div class="yapa-wish-move-time">${m.timeLabel || ""}</div>
+              </div>
+              <div class="yapa-wish-move-qty">${qty}</div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    this.updateYapaBonusStatus(modal);
+    this.updateYapaRailTimer();
+  }
   openAdminModal() {
     if (document.getElementById("admin-modal")) return;
 
@@ -353,8 +1065,13 @@ class EconomySystem {
           <div class="inv-title">Admin Items</div>
           <button id="adminClose" class="inv-x">\u2716</button>
         </div>
+        <div class="admin-tools">
+          <button id="adminSpendYapa100" class="admin-tool-btn admin-tool-out">Gastar 100 Yapa</button>
+          <button id="adminYaparYapa100" class="admin-tool-btn admin-tool-in">YAPAR 100 Yapa</button>
+          <button id="adminSpawnQrBtn" class="admin-tool-btn admin-tool-qr">Aparecer QR</button>
+        </div>
         <div id="adminList" class="inv-list admin-list"></div>
-        <small class="inv-hint">Toca un item para a\u00F1adirlo al inventario.</small>
+        <small id="adminHint" class="inv-hint">Toca un item para a\u00F1adirlo al inventario.</small>
       </div>
     `;
 
@@ -367,6 +1084,38 @@ class EconomySystem {
     modal.querySelector("#adminClose").onclick = close;
     modal.addEventListener("click", (e) => {
       if (e.target === modal) close();
+    });
+
+    const hintEl = modal.querySelector("#adminHint");
+    const setHint = (msg) => {
+      if (!hintEl) return;
+      hintEl.textContent = msg;
+    };
+
+    modal.querySelector("#adminSpendYapa100")?.addEventListener("click", () => {
+      const ok = this.spendYapas(100, "Admin");
+      if (!ok) {
+        setHint("No tienes suficiente Yapa para gastar 100.");
+        return;
+      }
+      setHint("Movimiento registrado: - S/.100");
+    });
+
+    modal.querySelector("#adminYaparYapa100")?.addEventListener("click", () => {
+      this.addYapas(100, "Admin", "in");
+      setHint("Movimiento registrado: S/.100");
+    });
+
+    modal.querySelector("#adminSpawnQrBtn")?.addEventListener("click", () => {
+      const res = this.scene?.forceSpawnYapaBonus?.();
+      if (res?.ok) {
+        setHint("QR de Bono Yapa activado.");
+        this.updateYapaBonusStatus(document.getElementById("yapa-modal"));
+      } else if (res?.reason === "active") {
+        setHint("Ya existe un Bono Yapa activo.");
+      } else {
+        setHint("No hay casas listas para cobrar.");
+      }
     });
 
     this.renderAdminList(modal.querySelector("#adminList"));
@@ -472,61 +1221,76 @@ class EconomySystem {
   }
   createUI() {
     const s = this.scene;
+    const HUD_FONT_FAMILY = "Melon Pop";
     const linear = Phaser?.Textures?.FilterMode?.LINEAR;
     if (linear !== undefined) {
       s.textures?.get?.("ui_moneda_icon")?.setFilter?.(linear);
       s.textures?.get?.("ui_exp_icon")?.setFilter?.(linear);
+      s.textures?.get?.("ui_yapa_icon")?.setFilter?.(linear);
+      s.textures?.get?.("ui_wish_perm_icon")?.setFilter?.(linear);
+      s.textures?.get?.("ui_wish_lim_icon")?.setFilter?.(linear);
     }
 
-    const style = (bg = "#0b1222", color = "#e5e7eb") => ({
-      fontFamily: "Arial",
-      fontStyle: "bold",
-      fontSize: "18px",
-      color,
-      backgroundColor: bg,
-      stroke: "#020617",
-      strokeThickness: 1
-    });
+    const style = (bg = null, color = "#ffffff") => {
+      const cfg = {
+        fontFamily: HUD_FONT_FAMILY,
+        fontStyle: "bold",
+        fontSize: "30px",
+        color,
+        stroke: "#000000",
+        strokeThickness: 7
+      };
+      if (bg) cfg.backgroundColor = bg;
+      return cfg;
+    };
     const addHudShadow = (el) => {
-      if (!el || typeof el.setShadow !== "function") return;
-      el.setShadow(0, 1, "#000000", 4, true, true);
+      // Sin sombra: solicitado para UI superior.
+      return;
     };
 
     // --- Textos base (se posicionan en layoutHorizontal)
-    this.goldText = s.add.text(0, 12, "", style("#14213a", "#f8fafc"))
-      .setOrigin(1, 0)
+    this.goldText = s.add.text(0, 12, "", style(null, "#ffffff"))
+      .setOrigin(0.5, 0.5)
       .setPadding(8, 6)
       .setScrollFactor(0)
       .setDepth(9999);
-    addHudShadow(this.goldText);
     this.goldUiIcon = s.textures?.exists?.("ui_moneda_icon")
       ? s.add.image(0, 12, "ui_moneda_icon")
         .setOrigin(0.5, 0.5)
         .setScrollFactor(0)
         .setDepth(10000)
       : null;
+    this.yapaText = s.add.text(0, 12, "", style(null, "#ffffff"))
+      .setOrigin(0.5, 0.5)
+      .setPadding(8, 6)
+      .setScrollFactor(0)
+      .setDepth(9999);
+    this.yapaUiIcon = s.textures?.exists?.("ui_yapa_icon")
+      ? s.add.image(0, 12, "ui_yapa_icon")
+        .setOrigin(0.5, 0.5)
+        .setScrollFactor(0)
+        .setDepth(10000)
+      : null;
 
-    this.levelText = s.add.text(0, 12, "", style("#1f2937", "#e5e7eb"))
-      .setOrigin(1, 0)
+    this.levelText = s.add.text(0, 12, "", style(null, "#ffffff"))
+      .setOrigin(0.5, 0.5)
       .setPadding(8, 6)
       .setScrollFactor(0)
       .setDepth(10005);
-    addHudShadow(this.levelText);
     this.levelText.setVisible(false);
 
     // EXP label (centrado dentro de la barra)
     this.expText = s.add.text(0, 30, "", {
-      fontFamily: "Arial",
-      fontSize: "14px",
+      fontFamily: HUD_FONT_FAMILY,
+      fontSize: "30px",
       fontStyle: "bold",
-      color: "#e5e7eb",
-      stroke: "#020617",
-      strokeThickness: 3
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 7
     })
       .setOrigin(0.5, 0.5)
       .setScrollFactor(0)
       .setDepth(10001);
-    addHudShadow(this.expText);
     this.expUiIcon = s.textures?.exists?.("ui_exp_icon")
       ? s.add.image(0, 30, "ui_exp_icon")
         .setOrigin(0.5, 0.5)
@@ -534,12 +1298,12 @@ class EconomySystem {
         .setDepth(10004)
       : null;
     this.expStarLevelText = s.add.text(0, 30, "", {
-      fontFamily: "Arial",
+      fontFamily: HUD_FONT_FAMILY,
       fontSize: "30px",
       fontStyle: "bold",
-      color: "#f7e733",
-      stroke: "#113c50",
-      strokeThickness: 5
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 7
     })
       .setOrigin(0.5, 0.5)
       .setScrollFactor(0)
@@ -559,6 +1323,11 @@ class EconomySystem {
     this.expBarFrame = s.add.graphics()
       .setScrollFactor(0)
       .setDepth(10002);
+    this.expBarMaskShape = s.make.graphics({ x: 0, y: 0, add: false });
+    this.expBarMask = this.expBarMaskShape.createGeometryMask();
+    this.expBarBg.setMask(this.expBarMask);
+    this.expBarFill.setMask(this.expBarMask);
+    this.expBarGloss.setMask(this.expBarMask);
     this.expBarWidth = 140;
     this.expBarHeight = 8;
     this.expBarBorder = 2;
@@ -567,19 +1336,34 @@ class EconomySystem {
     this.expBarY = 0;
 
     // Deseos (perm / limited)
-    this.permWishText = s.add.text(0, 12, "", style("#10243d", "#dbeafe"))
-      .setOrigin(1, 0)
+    this.permWishText = s.add.text(0, 12, "", style(null, "#ffffff"))
+      .setOrigin(0.5, 0.5)
       .setPadding(8, 6)
       .setScrollFactor(0)
       .setDepth(9999);
-    addHudShadow(this.permWishText);
+    this.permWishIcon = s.textures?.exists?.("ui_wish_perm_icon")
+      ? s.add.image(0, 12, "ui_wish_perm_icon")
+        .setOrigin(0.5, 0.5)
+        .setScrollFactor(0)
+        .setDepth(10000)
+      : null;
 
-    this.limitedWishText = s.add.text(0, 12, "", style("#3f1c15", "#ffedd5"))
-      .setOrigin(1, 0)
+    this.limitedWishText = s.add.text(0, 12, "", style(null, "#ffffff"))
+      .setOrigin(0.5, 0.5)
       .setPadding(8, 6)
       .setScrollFactor(0)
       .setDepth(9999);
-    addHudShadow(this.limitedWishText);
+
+    this.goldSlotBg = s.add.graphics().setScrollFactor(0).setDepth(9997);
+    this.yapaSlotBg = s.add.graphics().setScrollFactor(0).setDepth(9997);
+    this.permSlotBg = s.add.graphics().setScrollFactor(0).setDepth(9997);
+    this.limitedSlotBg = s.add.graphics().setScrollFactor(0).setDepth(9997);
+    this.limitedWishIcon = s.textures?.exists?.("ui_wish_lim_icon")
+      ? s.add.image(0, 12, "ui_wish_lim_icon")
+        .setOrigin(0.5, 0.5)
+        .setScrollFactor(0)
+        .setDepth(10000)
+      : null;
 
     // Boton Gacha (imagen custom + animaciones)
     this.gachaBtnIsImage = !!s.textures?.exists?.(GACHA_BTN_TEXTURE_KEY);
@@ -772,6 +1556,42 @@ class EconomySystem {
       .setInteractive({ useHandCursor: true })
       .setDepth(9999);
 
+    this.devSpendYapaBtn = s.add.text(0, 52, "-100 Yapa", {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#e2e8f0",
+      backgroundColor: "#7f1d1d"
+    })
+      .setOrigin(0, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
+    this.devYaparYapaBtn = s.add.text(0, 52, "YAPAR +100", {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#e2e8f0",
+      backgroundColor: "#0f766e"
+    })
+      .setOrigin(0, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
+    this.devSpawnQrBtn = s.add.text(0, 52, "Aparecer QR", {
+      fontFamily: "Arial",
+      fontSize: "14px",
+      color: "#e2e8f0",
+      backgroundColor: "#4c1d95"
+    })
+      .setOrigin(0, 0)
+      .setPadding(8, 5)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(9999);
+
     // Click: abrir modal
     this.gachaBtn.on("pointerdown", (pointer) => {
       if (this.hasBlockingOverlayOpen()) return;
@@ -852,6 +1672,27 @@ class EconomySystem {
       this.updateModalCounts();
     });
 
+    this.devSpendYapaBtn.on("pointerdown", (pointer) => {
+      if (this.hasBlockingOverlayOpen()) return;
+      s.uiGuard?.(pointer);
+      this.spendYapas(100, "Admin");
+    });
+
+    this.devYaparYapaBtn.on("pointerdown", (pointer) => {
+      if (this.hasBlockingOverlayOpen()) return;
+      s.uiGuard?.(pointer);
+      this.addYapas(100, "Admin", "in");
+    });
+
+    this.devSpawnQrBtn.on("pointerdown", (pointer) => {
+      if (this.hasBlockingOverlayOpen()) return;
+      s.uiGuard?.(pointer);
+      const res = this.scene?.forceSpawnYapaBonus?.();
+      if (res?.ok) {
+        this.updateYapaBonusStatus(document.getElementById("yapa-modal"));
+      }
+    });
+
     // Layout inicial
     this.layoutHorizontal();
 
@@ -859,8 +1700,14 @@ class EconomySystem {
     const uiList = [
       this.adminPanelBg,
       this.adminLabel,
+      this.goldSlotBg,
+      this.yapaSlotBg,
+      this.permSlotBg,
+      this.limitedSlotBg,
       this.goldText,
+      this.yapaText,
       this.goldUiIcon,
+      this.yapaUiIcon,
       this.levelText,
       this.expText,
       this.expUiIcon,
@@ -870,14 +1717,19 @@ class EconomySystem {
       this.expBarGloss,
       this.expBarFrame,
       this.permWishText,
+      this.permWishIcon,
       this.limitedWishText,
+      this.limitedWishIcon,
       this.gachaBtnGlow,
       this.gachaBtn,
       this.devPermBtn,
       this.devLimitedBtn,
       this.devGoldBtn,
       this.devExpBtn,
-      this.devMaxLevelBtn
+      this.devMaxLevelBtn,
+      this.devSpendYapaBtn,
+      this.devYaparYapaBtn,
+      this.devSpawnQrBtn
     ].filter(Boolean);
 
     if (Array.isArray(s.uiObjects)) {
@@ -895,43 +1747,64 @@ class EconomySystem {
     const s = this.scene;
     const w = s.scale.width;
     const h = s.scale.height;
-    const right = w - 14;
     const isCompact = w <= 1100;
     const isTiny = w <= 900;
+    const right = w - (isTiny ? 6 : 10);
     const top = isCompact ? 8 : 10;
     const gap = isTiny ? 8 : 10;
+    const gachaTargetH = isTiny ? 54 : 66;
+    const slotH = gachaTargetH;
+    const hasYapaHudIcon = !!this.yapaUiIcon;
+    const hasPermWishIcon = !!this.permWishIcon;
+    const hasLimitedWishIcon = !!this.limitedWishIcon;
 
     this.goldText.setText(this.formatGoldHUD(this.gold));
+    this.yapaText.setText(hasYapaHudIcon
+      ? `${this.formatYapaHUD(this.yapas)}`
+      : (isTiny ? `Yp:${this.formatYapaHUD(this.yapas)}` : `Yapa: ${this.formatYapaHUD(this.yapas)}`));
     this.levelText.setText(`Lv${this.level}`);
     this.levelText.setVisible(false);
     const permHUD = this.formatWishHUD(this.wishesPermanent);
     const limHUD = this.formatWishHUD(this.wishesLimited);
-    this.permWishText.setText(isTiny ? `Perm:${permHUD}` : `Perm: ${permHUD}`);
-    this.limitedWishText.setText(isTiny ? `Lim:${limHUD}` : `Lim: ${limHUD}`);
+    this.permWishText.setText(hasPermWishIcon ? `${permHUD}` : (isTiny ? `Perm:${permHUD}` : `Perm: ${permHUD}`));
+    this.limitedWishText.setText(hasLimitedWishIcon ? `${limHUD}` : (isTiny ? `Lim:${limHUD}` : `Lim: ${limHUD}`));
     this.expText.setText(this.level >= MAX_LEVEL ? MAX_EXP_LABEL : `${this.exp}/${this.expToNext}`);
     const starLevelHUD = String(Math.max(0, this.level)).padStart(2, "0");
     if (this.expStarLevelText?.setText) this.expStarLevelText.setText(starLevelHUD);
 
-    const fontSize = isTiny ? 20 : 26;
+    const fontSize = isTiny ? 26 : 30;
     const smallFont = isTiny ? 15 : 17;
-    const padX = isTiny ? 12 : 16;
-    const padY = isTiny ? 8 : 9;
+    const padX = isTiny ? 14 : 18;
+    const padY = isTiny ? 10 : 11;
+    const hudTracking = isTiny ? 1.8 : 2.5;
+    const expTracking = isTiny ? 1.5 : 2.2;
 
     const apply = (el, f = fontSize, px = padX, py = padY) => {
       if (!el) return;
       if (typeof el.setFontSize === "function") el.setFontSize(f);
       if (typeof el.setPadding === "function") el.setPadding(px, py);
     };
-    const applyFixedWidth = (el, width) => {
+    const applyTracking = (el, value) => {
+      if (!el) return;
+      if (typeof el.setLetterSpacing === "function") {
+        el.setLetterSpacing(value);
+        return;
+      }
+      if (el.style) {
+        el.style.letterSpacing = value;
+        if (typeof el.updateText === "function") el.updateText();
+      }
+    };
+    const applyFixedWidth = (el, width, height = 0) => {
       if (!el || typeof el.setFixedSize !== "function") return;
-      el.setFixedSize(width, 0);
+      el.setFixedSize(width, height);
       if (typeof el.setAlign === "function") el.setAlign("center");
     };
     const measureTextPx = (text, sizePx = fontSize, bold = true) => {
       this.hudMeasureCanvas = this.hudMeasureCanvas || document.createElement("canvas");
       const ctx = this.hudMeasureCanvas.getContext("2d");
       if (!ctx) return Math.ceil((String(text).length || 1) * (sizePx * 0.62));
-      ctx.font = `${bold ? "bold " : ""}${sizePx}px Arial`;
+      ctx.font = `${bold ? "900 " : ""}${sizePx}px "${HUD_FONT_FAMILY}"`;
       return Math.ceil(ctx.measureText(String(text)).width);
     };
     const getUIWidth = (el) => (el?.displayWidth ?? el?.width ?? 0);
@@ -940,8 +1813,10 @@ class EconomySystem {
       if (!this.gachaBtnGlow || !this.gachaBtn) return;
       this.gachaBtnGlow.setPosition(this.gachaBtn.x, this.gachaBtn.y);
     };
-    const goldIconTarget = isTiny ? 44 : 56;
-    const expIconTarget = isTiny ? 60 : 74;
+    const goldIconTarget = slotH;
+    const expIconTarget = slotH;
+    const yapaIconTarget = slotH;
+    const wishIconTarget = slotH;
     const iconGap = isTiny ? 10 : 14;
 
     const fitIcon = (icon, targetSize) => {
@@ -957,9 +1832,15 @@ class EconomySystem {
 
     const goldIconW = fitIcon(this.goldUiIcon, goldIconTarget);
     const expIconW = fitIcon(this.expUiIcon, expIconTarget);
+    const yapaIconW = fitIcon(this.yapaUiIcon, yapaIconTarget);
+    const permWishIconW = fitIcon(this.permWishIcon, wishIconTarget);
+    const limitedWishIconW = fitIcon(this.limitedWishIcon, wishIconTarget);
 
     const getExtraWidth = (el) => {
       if (el === this.goldText && goldIconW > 0) return goldIconW + iconGap;
+      if (el === this.yapaText && yapaIconW > 0) return yapaIconW + iconGap;
+      if (el === this.permWishText && permWishIconW > 0) return permWishIconW + iconGap;
+      if (el === this.limitedWishText && limitedWishIconW > 0) return limitedWishIconW + iconGap;
       return 0;
     };
 
@@ -967,28 +1848,36 @@ class EconomySystem {
 
     const placeIconForText = (icon, text) => {
       if (!icon || !text) return;
-      const left = text.x - getUIWidth(text);
+      const left = text.x - (getUIWidth(text) * 0.5);
+      const topY = text.y - (getUIHeight(text) * 0.5);
       icon.x = left - iconGap - (icon.displayWidth * 0.5);
-      icon.y = text.y + (getUIHeight(text) * 0.5);
+      icon.y = topY + (getUIHeight(text) * 0.5);
     };
 
     apply(this.goldText);
+    apply(this.yapaText);
     apply(this.permWishText);
     apply(this.limitedWishText);
-    if (this.expText?.setFontSize) this.expText.setFontSize(isTiny ? 16 : 20);
+    applyTracking(this.goldText, hudTracking);
+    applyTracking(this.yapaText, hudTracking);
+    applyTracking(this.permWishText, hudTracking);
+    applyTracking(this.limitedWishText, hudTracking);
+    if (this.expText?.setFontSize) this.expText.setFontSize(isTiny ? 26 : 30);
+    applyTracking(this.expText, expTracking);
 
     // Reserva exacta para: Oro 6 digitos, Deseos (texto + 3 digitos).
-    const slotPad = (padX * 2) + (isTiny ? 6 : 8);
-    const goldSlotW = measureTextPx("999999", fontSize, true) + slotPad;
-    const permSlotW = measureTextPx(isTiny ? "Perm:999" : "Perm: 999", fontSize, true) + slotPad;
-    const limSlotW = measureTextPx(isTiny ? "Lim:999" : "Lim: 999", fontSize, true) + slotPad;
+    // Ancho fijo por slot: no cambia aunque cambie el numero.
+    const goldSlotW = isTiny ? 190 : 240;
+    const yapaSlotW = isTiny ? 156 : 196;
+    const permSlotW = isTiny ? 140 : 172;
+    const limSlotW = isTiny ? 140 : 172;
     applyFixedWidth(this.goldText, goldSlotW);
+    applyFixedWidth(this.yapaText, yapaSlotW);
     applyFixedWidth(this.permWishText, permSlotW);
     applyFixedWidth(this.limitedWishText, limSlotW);
 
     if (this.gachaBtnIsImage) {
-      const targetH = isTiny ? 54 : 66;
-      this.gachaBtnBaseScale = targetH / this.gachaBtn.height;
+      this.gachaBtnBaseScale = gachaTargetH / this.gachaBtn.height;
       const hoverMul = this.gachaBtnHovering ? 1.03 : 1;
       this.gachaBtn.setScale(this.gachaBtnBaseScale * hoverMul);
       if (this.gachaBtnGlow) {
@@ -1004,10 +1893,13 @@ class EconomySystem {
     apply(this.devGoldBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
     apply(this.devExpBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
     apply(this.devMaxLevelBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devSpendYapaBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devYaparYapaBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
+    apply(this.devSpawnQrBtn, smallFont, isTiny ? 9 : 12, isTiny ? 6 : 7);
 
     this.expBarWidth = isTiny ? 220 : 300;
-    this.expBarHeight = isTiny ? 24 : 30;
-    this.expBarBorder = isTiny ? 4 : 5;
+    this.expBarHeight = slotH;
+    this.expBarBorder = 3;
     this.expBarRadius = Math.round(this.expBarHeight * 0.5);
     if (this.expStarLevelText?.setFontSize) {
       const starDigits = String(Math.max(0, this.level)).length;
@@ -1024,18 +1916,24 @@ class EconomySystem {
 
     const infoH = Math.max(
       getUIHeight(this.goldText),
+      getUIHeight(this.yapaText),
       getUIHeight(this.permWishText),
       getUIHeight(this.limitedWishText)
     );
     const expVisualH = Math.max(this.expBarHeight, this.expUiIcon ? getUIHeight(this.expUiIcon) : 0);
     const rowH = Math.max(infoH, expVisualH);
     const barY = top + Math.max(0, Math.round((rowH - this.expBarHeight) / 2));
-    const topRow = [this.limitedWishText, this.permWishText, this.goldText];
+    const topRowY = top + Math.round(rowH * 0.5);
+    const topRow = [this.limitedWishText, this.permWishText, this.yapaText, this.goldText];
     topRow.forEach((el) => {
-      el.y = top;
-      el.x = x;
+      el.y = topRowY;
+      el.x = x - (getUIWidth(el) * 0.5);
       x -= (getBlockWidth(el) + gap);
     });
+    this.drawHudValueSlot(this.goldSlotBg, this.goldText, 0, goldSlotW, slotH);
+    this.drawHudValueSlot(this.yapaSlotBg, this.yapaText, 0, yapaSlotW, slotH);
+    this.drawHudValueSlot(this.permSlotBg, this.permWishText, 0, permSlotW, slotH);
+    this.drawHudValueSlot(this.limitedSlotBg, this.limitedWishText, 0, limSlotW, slotH);
 
     const starToBarGap = isTiny ? 12 : 16;
     // Bloque EXP reservado completo: estrella izquierda + barra.
@@ -1043,8 +1941,10 @@ class EconomySystem {
     x -= expBlockW;
     const barLeft = x + (this.expUiIcon ? (expIconW + starToBarGap) : 0);
 
-    this.expBarX = barLeft;
-    this.expBarY = barY;
+    // Snap a pixel entero para evitar artefactos en bordes del frame.
+    this.expBarX = Math.round(barLeft);
+    this.expBarY = Math.round(barY);
+    this.updateExpBarMask();
     this.drawExpBarBackground();
     this.drawExpBarFrame();
     const ratio = (this.level >= MAX_LEVEL) ? 1 : ((this.expToNext <= 0) ? 0 : (this.exp / this.expToNext));
@@ -1064,10 +1964,13 @@ class EconomySystem {
     } else if (this.expStarLevelText) {
       this.expStarLevelText.setVisible(false);
     }
-    this.levelText.y = top;
+    this.levelText.y = topRowY;
     this.levelText.x = x;
 
     placeIconForText(this.goldUiIcon, this.goldText);
+    placeIconForText(this.yapaUiIcon, this.yapaText);
+    placeIconForText(this.permWishIcon, this.permWishText);
+    placeIconForText(this.limitedWishIcon, this.limitedWishText);
     syncGachaGlowPos();
 
     const panelPad = isTiny ? 8 : 10;
@@ -1078,7 +1981,10 @@ class EconomySystem {
       getUIWidth(this.devLimitedBtn),
       getUIWidth(this.devGoldBtn),
       getUIWidth(this.devExpBtn),
-      getUIWidth(this.devMaxLevelBtn)
+      getUIWidth(this.devMaxLevelBtn),
+      getUIWidth(this.devSpendYapaBtn),
+      getUIWidth(this.devYaparYapaBtn),
+      getUIWidth(this.devSpawnQrBtn)
     ) + (panelPad * 2);
     const panelH = panelPad
       + getUIHeight(this.adminLabel)
@@ -1092,6 +1998,12 @@ class EconomySystem {
       + getUIHeight(this.devExpBtn)
       + btnGap
       + getUIHeight(this.devMaxLevelBtn)
+      + btnGap
+      + getUIHeight(this.devSpendYapaBtn)
+      + btnGap
+      + getUIHeight(this.devYaparYapaBtn)
+      + btnGap
+      + getUIHeight(this.devSpawnQrBtn)
       + panelPad;
 
     const adminX = right - panelW;
@@ -1118,94 +2030,221 @@ class EconomySystem {
     this.devMaxLevelBtn.x = contentX;
     this.devMaxLevelBtn.y = this.devExpBtn.y + getUIHeight(this.devExpBtn) + btnGap;
 
+    this.devSpendYapaBtn.x = contentX;
+    this.devSpendYapaBtn.y = this.devMaxLevelBtn.y + getUIHeight(this.devMaxLevelBtn) + btnGap;
+
+    this.devYaparYapaBtn.x = contentX;
+    this.devYaparYapaBtn.y = this.devSpendYapaBtn.y + getUIHeight(this.devSpendYapaBtn) + btnGap;
+
+    this.devSpawnQrBtn.x = contentX;
+    this.devSpawnQrBtn.y = this.devYaparYapaBtn.y + getUIHeight(this.devYaparYapaBtn) + btnGap;
+
     this.adminPanelBg.x = adminX;
     this.adminPanelBg.y = adminY;
     this.adminPanelBg.width = panelW;
     this.adminPanelBg.height = panelH;
+
+    this.positionYapaRail();
+  }
+
+  drawHudFrameOnGraphics(gfx, x, y, w, h, radius, border = 2) {
+    if (!gfx) return;
+    const outerStroke = border + 2;
+    const inset = outerStroke * 0.5;
+    const alignHalf = (v) => Math.round(v * 2) / 2;
+    const frameX = alignHalf(x + inset);
+    const frameY = alignHalf(y + inset);
+    const frameW = alignHalf(Math.max(0, w - outerStroke));
+    const frameH = alignHalf(Math.max(0, h - outerStroke));
+    const frameR = Math.max(1, alignHalf(radius - inset));
+    if (frameW <= 0 || frameH <= 0) return;
+
+    // mismo marco para EXP y contadores (estilo original)
+    gfx.lineStyle(outerStroke, 0x4d3f23, 0.65);
+    gfx.strokeRoundedRect(frameX, frameY, frameW, frameH, frameR);
+    gfx.lineStyle(border, 0xf6eed8, 1);
+    gfx.strokeRoundedRect(frameX, frameY, frameW, frameH, frameR);
+  }
+
+  drawHudValueSlot(gfx, textObj, leftExtra = 0, forcedWidth = 0, forcedHeight = 0) {
+    if (!gfx) return;
+    if (!textObj) {
+      gfx.clear();
+      return;
+    }
+
+    const extra = Math.max(0, Math.round(leftExtra || 0));
+    const baseW = Math.max(30, Math.round(forcedWidth || textObj.displayWidth || textObj.width || 0));
+    const w = baseW + extra;
+    const h = Math.max(20, Math.round(forcedHeight || textObj.displayHeight || textObj.height || 0));
+    const ox = Number(textObj.originX ?? 0);
+    const x = Math.round((textObj.x ?? 0) - (baseW * ox) - extra);
+    const oy = Number(textObj.originY ?? 0);
+    const y = Math.round((textObj.y ?? 0) - (h * oy));
+    const r = Math.max(9, Math.round(h * 0.52));
+
+    gfx.clear();
+    // fondo claro limpio (sin sombras extras que rompen el borde)
+    gfx.fillStyle(0xf8f6ec, 1);
+    gfx.fillRoundedRect(x, y, w, h, r);
+    this.drawHudFrameOnGraphics(gfx, x, y, w, h, r, 2);
+  }
+
+  updateExpBarMask() {
+    if (!this.expBarMaskShape) return;
+    const x = Math.round(this.expBarX || 0);
+    const y = Math.round(this.expBarY || 0);
+    const w = Math.max(0, Math.round(this.expBarWidth || 0));
+    const h = Math.max(0, Math.round(this.expBarHeight || 0));
+    const r = Math.max(1, Math.round(this.expBarRadius || Math.round(h * 0.5)));
+    const inset = Math.max(2, Math.round((this.expBarBorder || 2) + 1));
+    const mx = x + inset;
+    const my = y + inset;
+    const mw = Math.max(0, w - (inset * 2));
+    const mh = Math.max(0, h - (inset * 2));
+    const mr = Math.max(2, r - inset);
+    this.expBarMaskShape.clear();
+    this.expBarMaskShape.fillStyle(0xffffff, 1);
+    this.expBarMaskShape.fillRoundedRect(mx, my, mw, mh, mr);
   }
 
   drawExpBarBackground() {
     if (!this.expBarBg) return;
-    const x = this.expBarX || 0;
-    const y = this.expBarY || 0;
-    const w = this.expBarWidth || 0;
-    const h = this.expBarHeight || 0;
-    const r = this.expBarRadius || Math.round(h * 0.5);
+    const x = Math.round(this.expBarX || 0);
+    const y = Math.round(this.expBarY || 0);
+    const w = Math.max(0, Math.round(this.expBarWidth || 0));
+    const h = Math.max(0, Math.round(this.expBarHeight || 0));
+    const r = Math.max(1, Math.round(this.expBarRadius || Math.round(h * 0.5)));
     this.expBarBg.clear();
-    // Track dorado/marron
+    // Track dorado/marron (como antes)
     this.expBarBg.fillStyle(0x7d6a42, 1);
     this.expBarBg.fillRoundedRect(x, y, w, h, r);
-    // Sombra interior superior para dar look cartoon
+    // Sombra interior superior para profundidad
     this.expBarBg.fillStyle(0x4d3f23, 0.32);
-    this.expBarBg.fillRoundedRect(x + 2, y + 2, Math.max(0, w - 4), Math.max(2, Math.floor(h * 0.28)), Math.max(2, r - 2));
+    this.expBarBg.fillRoundedRect(
+      x + 2,
+      y + 2,
+      Math.max(0, w - 4),
+      Math.max(2, Math.floor(h * 0.28)),
+      Math.max(2, r - 2)
+    );
   }
 
   drawExpBarFrame() {
     if (!this.expBarFrame) return;
-    const x = this.expBarX || 0;
-    const y = this.expBarY || 0;
-    const w = this.expBarWidth || 0;
-    const h = this.expBarHeight || 0;
-    const border = this.expBarBorder || 2;
-    const radius = this.expBarRadius || Math.max(3, Math.round(h * 0.5));
+    const x = Math.round(this.expBarX || 0);
+    const y = Math.round(this.expBarY || 0);
+    const w = Math.max(0, Math.round(this.expBarWidth || 0));
+    const h = Math.max(0, Math.round(this.expBarHeight || 0));
+    const border = Math.max(1, Math.round(this.expBarBorder || 2));
+    const radius = Math.max(3, Math.round(this.expBarRadius || Math.max(3, Math.round(h * 0.5))));
+
     this.expBarFrame.clear();
-    // borde externo oscuro + borde crema interno
-    this.expBarFrame.lineStyle(border + 2, 0x4d3f23, 0.65);
-    this.expBarFrame.strokeRoundedRect(x, y, w, h, radius);
-    this.expBarFrame.lineStyle(border, 0xf6eed8, 1);
-    this.expBarFrame.strokeRoundedRect(x, y, w, h, radius);
+    this.drawHudFrameOnGraphics(this.expBarFrame, x, y, w, h, radius, border);
   }
 
   setExpBarRatio(value) {
     if (!this.expBarFill) return;
     const clamped = Phaser.Math.Clamp(value, 0, 1);
-    const h = this.expBarHeight || 8;
-    const border = this.expBarBorder || 2;
-    const x = this.expBarX || 0;
-    const y = this.expBarY || 0;
-    const radius = this.expBarRadius || Math.max(3, Math.round(h * 0.5));
+    const h = Math.max(1, Math.round(this.expBarHeight || 8));
+    const border = Math.max(1, Math.round(this.expBarBorder || 2));
+    const x = Math.round(this.expBarX || 0);
+    const y = Math.round(this.expBarY || 0);
     const inset = border + 1;
     const innerW = Math.max(0, (this.expBarWidth || 0) - (inset * 2));
     const innerH = Math.max(1, h - (inset * 2));
-    const fillW = innerW * clamped;
-    const fillR = Math.max(2, Math.min(Math.round(innerH * 0.5), Math.round(fillW * 0.5)));
+    const fillW = Math.max(0, Math.floor(innerW * clamped));
+    const fullW = Math.max(0, Math.floor(innerW));
+    const isFull = fillW >= Math.max(1, fullW - 1);
+    const bodyX = x + inset;
+    const bodyY = y + inset;
+    const capR = Math.max(2, Math.floor(innerH * 0.5));
+    const glossyMinW = Math.max(10, Math.round(innerH * 1.35));
 
     this.expBarFill.clear();
     if (fillW > 0) {
-      // Fill plomo metalico base
+      // Base gris
       this.expBarFill.fillStyle(0x9ca5b0, 1);
-      this.expBarFill.fillRoundedRect(x + inset, y + inset, fillW, innerH, fillR);
-      // Reflejo metalico superior
+      if (isFull) {
+        // Solo llena completo termina redondo.
+        this.expBarFill.fillRoundedRect(bodyX, bodyY, innerW, innerH, capR);
+      } else {
+        // Parcial: punta derecha recta.
+        if (fillW <= capR + 1) {
+          this.expBarFill.fillRect(bodyX, bodyY, fillW, innerH);
+        } else {
+          // Izquierda redondeada + cuerpo recto.
+          this.expBarFill.fillCircle(bodyX + capR, bodyY + capR, capR);
+          this.expBarFill.fillRect(bodyX + capR, bodyY, fillW - capR, innerH);
+        }
+      }
+
+      // Reflejo superior
       this.expBarFill.fillStyle(0xeff3f7, 0.7);
-      this.expBarFill.fillRoundedRect(x + inset + 1, y + inset + 1, Math.max(0, fillW - 2), Math.max(2, Math.floor(innerH * 0.5)), Math.max(2, fillR - 1));
-      // Sombra inferior para profundidad
+      if (isFull) {
+        this.expBarFill.fillRoundedRect(
+          bodyX + 1,
+          bodyY + 1,
+          Math.max(0, innerW - 2),
+          Math.max(2, Math.floor(innerH * 0.5)),
+          Math.max(2, capR - 1)
+        );
+      } else {
+        this.expBarFill.fillRect(
+          bodyX + 1,
+          bodyY + 1,
+          Math.max(0, fillW - 2),
+          Math.max(2, Math.floor(innerH * 0.42))
+        );
+      }
+
+      // Sombra inferior
       this.expBarFill.fillStyle(0x66707e, 0.28);
-      this.expBarFill.fillRoundedRect(
-        x + inset + 1,
-        y + inset + Math.max(1, Math.floor(innerH * 0.5)),
-        Math.max(0, fillW - 2),
-        Math.max(1, Math.floor(innerH * 0.45)),
-        Math.max(2, fillR - 1)
-      );
+      if (isFull) {
+        this.expBarFill.fillRoundedRect(
+          bodyX + 1,
+          bodyY + Math.max(1, Math.floor(innerH * 0.5)),
+          Math.max(0, innerW - 2),
+          Math.max(1, Math.floor(innerH * 0.45)),
+          Math.max(2, capR - 1)
+        );
+      } else {
+        this.expBarFill.fillRect(
+          bodyX + 1,
+          bodyY + Math.max(1, Math.floor(innerH * 0.5)),
+          Math.max(0, fillW - 2),
+          Math.max(1, Math.floor(innerH * 0.45))
+        );
+      }
     }
 
     if (this.expBarGloss) {
       this.expBarGloss.clear();
-      if (fillW > 0) {
-        this.expBarGloss.fillStyle(0xffffff, 0.18);
-        this.expBarGloss.fillRoundedRect(
-          x + inset + 2,
-          y + inset + 2,
-          Math.max(0, fillW - 4),
-          Math.max(1, Math.floor(innerH * 0.28)),
-          Math.max(2, fillR - 2)
-        );
+      if (fillW >= glossyMinW) {
+        this.expBarGloss.fillStyle(0xffffff, 0.1);
+        if (isFull) {
+          this.expBarGloss.fillRoundedRect(
+            bodyX + 2,
+            bodyY + 2,
+            Math.max(0, innerW - 4),
+            Math.max(1, Math.floor(innerH * 0.2)),
+            Math.max(2, capR - 2)
+          );
+        } else {
+          this.expBarGloss.fillRect(
+            bodyX + 2,
+            bodyY + 2,
+            Math.max(0, fillW - 4),
+            Math.max(1, Math.floor(innerH * 0.2))
+          );
+        }
       }
     }
   }
 
   refreshUI() {
     this.goldText.setText(`${this.formatGoldHUD(this.gold)}`);
+    this.yapaText.setText(this.yapaUiIcon ? `${this.formatYapaHUD(this.yapas)}` : `Yapa: ${this.formatYapaHUD(this.yapas)}`);
     this.levelText.setText(`Lv${this.level}`);
     this.levelText.setVisible(false);
     if (this.expStarLevelText?.setText) {
@@ -1213,8 +2252,8 @@ class EconomySystem {
     }
 
     // deseos separados
-    this.permWishText.setText(`Perm: ${this.formatWishHUD(this.wishesPermanent)}`);
-    this.limitedWishText.setText(`Lim: ${this.formatWishHUD(this.wishesLimited)}`);
+    this.permWishText.setText(this.permWishIcon ? `${this.formatWishHUD(this.wishesPermanent)}` : `Perm: ${this.formatWishHUD(this.wishesPermanent)}`);
+    this.limitedWishText.setText(this.limitedWishIcon ? `${this.formatWishHUD(this.wishesLimited)}` : `Lim: ${this.formatWishHUD(this.wishesLimited)}`);
 
     // exp text + bar
     const cur = this.exp;
@@ -2279,7 +3318,7 @@ class EconomySystem {
         border-radius: 16px;
         padding: 16px;
         box-shadow: 0 20px 60px rgba(0,0,0,.5);
-        font-family: Arial;
+        font-family: "Arial", Arial, sans-serif;
 
         transform: translateY(12px) scale(.98);
         opacity: 0;
@@ -2498,6 +3537,11 @@ class EconomySystem {
       if (this[useField] < n) return;
 
       this[useField] -= n;
+      this.recordYapaWishMovement(
+        "out",
+        type === "lim" ? "Deseo Limitado" : "Deseo Permanente",
+        n
+      );
 
       const results = [];
       const DOUBLE_FIVE_CHANCE = 0.0002; // 0.02%
@@ -2555,24 +3599,24 @@ class EconomySystem {
 
   updateModalCounts() {
     const modal = document.getElementById("gacha-modal");
-    if (!modal) return;
+    if (modal) {
+      const perm = modal.querySelector("#permCount");
+      const lim = modal.querySelector("#limCount");
 
-    const perm = modal.querySelector("#permCount");
-    const lim = modal.querySelector("#limCount");
+      if (perm) perm.textContent = String(this.wishesPermanent);
+      if (lim) lim.textContent = String(this.wishesLimited);
 
-    if (perm) perm.textContent = String(this.wishesPermanent);
-    if (lim) lim.textContent = String(this.wishesLimited);
+      // actualizar contadores de inventario si est\u00E1n
+      const invEls = modal.querySelectorAll("[data-inv]");
+      invEls.forEach((el) => {
+        const key = el.getAttribute("data-inv");
+        if (!key) return;
+        el.textContent = String(this.inventory[key] || 0);
+      });
 
-    // actualizar contadores de inventario si est\u00E1n
-    const invEls = modal.querySelectorAll("[data-inv]");
-    invEls.forEach((el) => {
-      const key = el.getAttribute("data-inv");
-      if (!key) return;
-      el.textContent = String(this.inventory[key] || 0);
-    });
-
-    // re-render de lista (para que agregue items nuevos aunque no exist\u00EDan)
-    this.renderInventoryIntoModal();
+      // re-render de lista (para que agregue items nuevos aunque no exist\u00EDan)
+      this.renderInventoryIntoModal();
+    }
 
     // tambi\u00E9n actualiza inventario standalone si est\u00E1 abierto
     const invModal = document.getElementById("inventory-modal");
@@ -2580,6 +3624,8 @@ class EconomySystem {
       const list = invModal.querySelector("#invList");
       this.renderInventoryIntoContainer(list);
     }
+
+    this.renderYapaModalData();
   }
 
   // =========================
@@ -2602,4 +3648,29 @@ class EconomySystem {
     this.refreshUI();
     this.updateModalCounts();
   }
+
+  addYapas(v, detail = "Usuario", kind = "in") {
+    const amount = Math.max(0, Math.round(Number(v) || 0));
+    if (amount <= 0) return;
+    this.yapas += amount;
+    this.recordYapaMovement(amount, detail, kind);
+    this.refreshUI();
+    this.updateModalCounts();
+  }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

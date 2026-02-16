@@ -1,4 +1,4 @@
-ï»¿// =========================
+// =========================
 // MAPA (10 veces mas grande)
 // =========================
 const MAP_W = 700;
@@ -235,6 +235,13 @@ const RARITY_MODS = {
   5: { build: 0.6, prod: 1.3,  reward: 3.0 }
 };
 
+// =========================
+// BONO YAPA (1?/2?/3?)
+// =========================
+const YAPA_BONUS_INTERVAL_MS = 15 * 60 * 1000; // cada 15 min
+const YAPA_BONUS_DURATION_MS = 60 * 1000;      // dura 1 min
+const YAPA_BONUS_CHANCE = 0.0002;              // 0.02%
+
 // 0 = libre, >0 = id edificio
 const grid = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
 let nextBuildingId = 1;
@@ -334,6 +341,9 @@ class MainScene extends Phaser.Scene {
     this.load.image("ui_gachapon_btn", "img/gachaponbutton.png");
     this.load.image("ui_moneda_icon", "img/moneda.png");
     this.load.image("ui_exp_icon", "img/experiencia.png");
+    this.load.image("ui_yapa_icon", "img/yapa.png");
+    this.load.image("ui_wish_perm_icon", "img/deseoperma.png");
+    this.load.image("ui_wish_lim_icon", "img/deseolimi.png");
     this.load.image("green_house_1x1_normal", "img/green_casa1x1_normal.png");
     this.load.image("green_house_1x1_giro1", "img/green_casa1x1_giro1.png");
     this.load.image("green_house_1x1_giro2", "img/green_casa1x1_giro2.png");
@@ -358,6 +368,7 @@ class MainScene extends Phaser.Scene {
       const h = gameSize.height;
       this.uiCam.setSize(w, h);
       this.clampWorldCamera();
+      this.updateBottomHintLayout();
     });
 
     this.input.mouse.disableContextMenu();
@@ -400,8 +411,11 @@ class MainScene extends Phaser.Scene {
     this.selectedBuildingId = null;
     this.moveMode = null;
     this.hoverAuraBuildingId = null;
+    this.yapaScanMode = false;
     // [OK] item seleccionado para construir (por defecto el verde 1x1)
     this.selectedBuildKey = "green_1";
+    this.nextYapaBonusAt = Date.now() + YAPA_BONUS_INTERVAL_MS;
+    this.activeYapaBonusBuildingId = null;
 
     // lista de objetos UI para que el WORLD cam los ignore (asi NO se mueven con zoom)
     this.uiObjects = [];
@@ -411,7 +425,7 @@ class MainScene extends Phaser.Scene {
     };
 
     // ===== UI fija =====
-    regUI(
+    this.helpText = regUI(
       this.add.text(
         16, 12,
         "City Builder Iso | Arrastra para mover | Zoom: rueda/pinch",
@@ -426,6 +440,7 @@ class MainScene extends Phaser.Scene {
         { fontFamily: "Arial", fontSize: "14px", color: "#94a3b8" }
       ).setScrollFactor(0).setDepth(9999)
     );
+    this.updateBottomHintLayout();
 
     // crea botones UI (los registra adentro)
     this.createCancelBuildButton(regUI);
@@ -441,8 +456,8 @@ class MainScene extends Phaser.Scene {
     // ===== Camara / bounds =====
     this.setupCameraBounds();
 
-    // [OK] Zoom inicial
-    this.worldCam.setZoom(1);
+    // [OK] Zoom inicial: arrancar al maximo configurado
+    this.worldCam.setZoom(ZOOM_MAX);
 
     // [OK] Controles de zoom (rueda + pinch)
     this.setupZoomControls();
@@ -591,6 +606,11 @@ class MainScene extends Phaser.Scene {
 
       const idOnTile = grid[tile.r][tile.c];
 
+      if (this.yapaScanMode) {
+        this.handleYapaScanTap(idOnTile);
+        return;
+      }
+
       if (idOnTile) {
         // En modo construccion no abrir info de edificios
         if (mode === "build") return;
@@ -627,6 +647,9 @@ class MainScene extends Phaser.Scene {
 
   update() {
     const cam = this.worldCam;
+    if (this.yapaScanMode && !this.getActiveYapaBonusBuilding(Date.now())) {
+      this.stopYapaScanMode();
+    }
     if ((document.getElementById("evo-modal") || document.getElementById("building-modal")) && mode === "build") {
       this.setCursorMode();
     }
@@ -785,14 +808,76 @@ class MainScene extends Phaser.Scene {
       document.getElementById("gacha-modal") ||
       document.getElementById("gacha-anim-overlay") ||
       document.getElementById("inventory-modal") ||
-      document.getElementById("admin-modal")
+      document.getElementById("admin-modal") ||
+      document.getElementById("yapa-modal") ||
+      document.getElementById("yapa-qr-modal")
     );
   }
 
   modeLabel() {
+    if (this.yapaScanMode) {
+      return "Modo: Escanear QR | Toca la casa con icono Yapa";
+    }
     return mode === "build"
       ? "Modo: \u{1F3D7}\uFE0F Construccion"
       : "Modo: \u{1F5B1}\uFE0F Cursor";
+  }
+
+  startYapaScanMode() {
+    const active = this.getActiveYapaBonusBuilding(Date.now());
+    if (!active) return false;
+
+    this.closeBuildingMenu();
+    if (this.moveMode) this.cancelMoveMode(true);
+    this.setCursorMode();
+    this.yapaScanMode = true;
+    this.modeText.setText(this.modeLabel());
+    return true;
+  }
+
+  stopYapaScanMode() {
+    if (!this.yapaScanMode) return;
+    this.yapaScanMode = false;
+    this.modeText.setText(this.modeLabel());
+  }
+
+  handleYapaScanTap(idOnTile) {
+    if (!this.yapaScanMode) return false;
+    const now = Date.now();
+    const active = this.getActiveYapaBonusBuilding(now);
+    if (!active) {
+      this.stopYapaScanMode();
+      return false;
+    }
+    if (!idOnTile || idOnTile !== active.id) return false;
+
+    const def = BUILDING_TYPES[active.typeKey] || BUILDING_TYPES.green_1;
+    const payload = {
+      buildingId: active.id,
+      typeKey: active.typeKey,
+      label: def.label || active.typeKey
+    };
+
+    const amount = 5 + Math.floor(Math.random() * 6); // 5..10
+    this.economy?.openYapaQrModal?.({ ...payload, amount });
+    this.economy?.updateYapaRailTimer?.();
+    this.stopYapaScanMode();
+    return true;
+  }
+
+  claimYapaBonusFromQr(buildingId) {
+    const b = this.getActiveYapaBonusBuilding(Date.now());
+    if (!b) return false;
+    if (Number(buildingId) !== Number(b.id)) return false;
+    this.clearBuildingYapaBonus(b);
+    return true;
+  }
+
+  updateBottomHintLayout() {
+    const h = this.scale?.height || this.game?.config?.height || 1080;
+    const baseY = Math.max(150, h - 76);
+    if (this.helpText?.setPosition) this.helpText.setPosition(16, baseY);
+    if (this.modeText?.setPosition) this.modeText.setPosition(16, baseY + 28);
   }
 
   getBuildPreview() {
@@ -867,6 +952,7 @@ class MainScene extends Phaser.Scene {
   }
 
   setBuildMode() {
+    if (this.yapaScanMode) this.stopYapaScanMode();
     if (document.getElementById("evo-modal") || document.getElementById("building-modal")) {
       this.setCursorMode();
       return;
@@ -1319,6 +1405,196 @@ class MainScene extends Phaser.Scene {
     const reward = src.reward || { exp: 0, gold: 0 };
     const rewardTotal = Math.max(0, reward.exp || 0) + Math.max(0, reward.gold || 0);
     return prodSeconds > 0 && rewardTotal > 0;
+  }
+
+  isYapaBonusEligibleBuilding(b, def = null) {
+    if (!b || !b.isBuilt) return false;
+    const rarity = this.getRarityForKey(b.typeKey);
+    return rarity >= 1 && rarity <= 3;
+  }
+
+  ensureYapaBonusIcon(b) {
+    if (!b) return null;
+    if (b.yapaBonusIcon) return b.yapaBonusIcon;
+    let icon;
+    if (this.textures?.exists?.("ui_yapa_icon")) {
+      icon = this.add.image(0, 0, "ui_yapa_icon")
+        .setOrigin(0.5, 0.5)
+        .setDepth(83)
+        .setVisible(false);
+      icon.setDisplaySize(24, 24);
+    } else {
+      icon = this.add.text(0, 0, "S/", {
+        fontFamily: "Arial",
+        fontSize: "12px",
+        fontStyle: "bold",
+        color: "#5b21b6",
+        backgroundColor: "#2dd4bf"
+      })
+        .setOrigin(0.5, 0.5)
+        .setPadding(4, 1, 4, 1)
+        .setDepth(83)
+        .setVisible(false);
+      icon.setStroke("#ecfeff", 1);
+    }
+    this.uiCam.ignore(icon);
+    b.yapaBonusIcon = icon;
+    return icon;
+  }
+
+  clearBuildingYapaBonus(b) {
+    if (!b) return;
+    b.yapaBonusReady = false;
+    b.yapaBonusExpiresAt = 0;
+    b.yapaBonusIcon?.setVisible(false);
+    if (this.activeYapaBonusBuildingId === b.id) {
+      this.activeYapaBonusBuildingId = null;
+    }
+  }
+
+  getActiveYapaBonusBuilding(now = Date.now()) {
+    const activeId = this.activeYapaBonusBuildingId;
+    if (!activeId) return null;
+    const b = buildings.get(activeId);
+    if (!b || !b.yapaBonusReady) {
+      this.activeYapaBonusBuildingId = null;
+      return null;
+    }
+    if (now >= (b.yapaBonusExpiresAt || 0)) {
+      this.clearBuildingYapaBonus(b);
+      return null;
+    }
+    return b;
+  }
+
+  trySpawnYapaBonus(now = Date.now()) {
+    this.getActiveYapaBonusBuilding(now);
+    if (this.getActiveYapaBonusBuilding(now)) return;
+
+    if (this.nextYapaBonusAt == null) {
+      this.nextYapaBonusAt = now + YAPA_BONUS_INTERVAL_MS;
+      return;
+    }
+    if (now < this.nextYapaBonusAt) return;
+
+    // si el tiempo avanzó en segundo plano, procesa intervalos pendientes
+    let dueCount = 0;
+    while (now >= this.nextYapaBonusAt && dueCount < 24) {
+      dueCount++;
+      this.nextYapaBonusAt += YAPA_BONUS_INTERVAL_MS;
+
+      if (this.getActiveYapaBonusBuilding(now)) continue;
+      if (Math.random() > YAPA_BONUS_CHANCE) continue;
+
+      const candidates = [];
+      for (const b of buildings.values()) {
+        const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+        if (!this.isYapaBonusEligibleBuilding(b, def)) continue;
+        candidates.push(b);
+      }
+      if (!candidates.length) continue;
+
+      const idx = Math.floor(Math.random() * candidates.length);
+      const selected = candidates[idx];
+      this.ensureYapaBonusIcon(selected);
+      selected.yapaBonusReady = true;
+      selected.yapaBonusExpiresAt = now + YAPA_BONUS_DURATION_MS;
+      this.activeYapaBonusBuildingId = selected.id;
+      break;
+    }
+  }
+
+  forceSpawnYapaBonus() {
+    const now = Date.now();
+    const active = this.getActiveYapaBonusBuilding(now);
+    if (active) {
+      return { ok: false, reason: "active", buildingId: active.id };
+    }
+
+    const candidates = [];
+    for (const b of buildings.values()) {
+      if (!b?.isBuilt) continue;
+      const rarity = this.getRarityForKey(b.typeKey);
+      if (rarity < 1 || rarity > 3) continue;
+      candidates.push(b);
+    }
+
+    if (!candidates.length) {
+      return { ok: false, reason: "none" };
+    }
+
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+    this.ensureYapaBonusIcon(selected);
+    selected.yapaBonusReady = true;
+    selected.yapaBonusExpiresAt = now + YAPA_BONUS_DURATION_MS; // respeta timer de 1 min
+    this.activeYapaBonusBuildingId = selected.id;
+
+    return { ok: true, reason: "spawned", buildingId: selected.id };
+  }
+
+  getYapaBonusStatus(now = Date.now()) {
+    const b = this.getActiveYapaBonusBuilding(now);
+    if (!b) {
+      return { active: false, remainMs: 0, buildingId: null, label: "" };
+    }
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+    return {
+      active: true,
+      remainMs: Math.max(0, (b.yapaBonusExpiresAt || 0) - now),
+      buildingId: b.id,
+      typeKey: b.typeKey,
+      label: def.label || b.typeKey
+    };
+  }
+
+  focusCameraOnBuilding(buildingId, duration = 520) {
+    const b = buildings.get(buildingId);
+    if (!b) return false;
+    const center = this.getBuildingGridCenter(b);
+    const anchor = center ? isoToScreen(center.r, center.c) : this.getBuildingAnchor(b);
+    if (!anchor) return false;
+    const cam = this.worldCam;
+    if (!cam) return false;
+    const startCenter = cam.getWorldPoint(cam.width * 0.5, cam.height * 0.5);
+    if (!Number.isFinite(startCenter?.x) || !Number.isFinite(startCenter?.y)) return false;
+
+    if (this._focusCamTween) {
+      this._focusCamTween.stop();
+      this._focusCamTween = null;
+    }
+
+    const tweenState = { t: 0 };
+    this._focusCamTween = this.tweens.add({
+      targets: tweenState,
+      t: 1,
+      duration,
+      ease: "Cubic.Out",
+      onUpdate: () => {
+        const x = Phaser.Math.Linear(startCenter.x, anchor.x, tweenState.t);
+        const y = Phaser.Math.Linear(startCenter.y, anchor.y, tweenState.t);
+        cam.centerOn(x, y);
+        this.clampWorldCamera();
+      },
+      onComplete: () => {
+        cam.centerOn(anchor.x, anchor.y);
+        this.clampWorldCamera();
+        this._focusCamTween = null;
+      }
+    });
+    return true;
+  }
+
+  consumeYapaBonusForScan(now = Date.now()) {
+    const b = this.getActiveYapaBonusBuilding(now);
+    if (!b) return null;
+    const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
+    const payload = {
+      buildingId: b.id,
+      typeKey: b.typeKey,
+      label: def.label || b.typeKey
+    };
+    this.clearBuildingYapaBonus(b);
+    return payload;
   }
 
   getAreaBuffForBuilding(targetB) {
@@ -1786,7 +2062,7 @@ class MainScene extends Phaser.Scene {
             border-radius: 14px;
             padding: 12px;
             box-shadow: 0 20px 60px rgba(0,0,0,.5);
-            font-family: Arial;
+            font-family: "Arial", Arial, sans-serif;
             display: grid;
             gap: 10px;
             position: relative;
@@ -2915,7 +3191,7 @@ class MainScene extends Phaser.Scene {
         border-radius: 16px;
         padding: 16px;
         box-shadow: 0 20px 60px rgba(0,0,0,.5);
-        font-family: Arial;
+        font-family: "Arial", Arial, sans-serif;
         transform: translateY(12px) scale(.98);
         opacity: 0;
         transition: transform .18s ease, opacity .18s ease;
@@ -3414,6 +3690,10 @@ class MainScene extends Phaser.Scene {
     b.glowGfx?.destroy();
     b.rewardGoldIcon?.destroy();
     b.rewardExpIcon?.destroy();
+    b.yapaBonusIcon?.destroy();
+    if (this.activeYapaBonusBuildingId === id) {
+      this.activeYapaBonusBuildingId = null;
+    }
     buildings.delete(id);
     freeBuilding(id);
     this.recalculateAllBuildingStats(Date.now());
@@ -3439,6 +3719,7 @@ class MainScene extends Phaser.Scene {
     b.prodStart = Date.now();
     b.rewardGoldIcon?.setVisible(false);
     b.rewardExpIcon?.setVisible(false);
+    this.economy?.updateYapaRailTimer?.();
   }
 
   placeBuilding(r0, c0) {
@@ -3532,7 +3813,29 @@ class MainScene extends Phaser.Scene {
       .setVisible(false)
       .setInteractive({ useHandCursor: true });
 
-    this.uiCam.ignore([rewardGoldIcon, rewardExpIcon]);
+    let yapaBonusIcon;
+    if (this.textures?.exists?.("ui_yapa_icon")) {
+      yapaBonusIcon = this.add.image(0, 0, "ui_yapa_icon")
+        .setOrigin(0.5, 0.5)
+        .setDepth(83)
+        .setVisible(false);
+      yapaBonusIcon.setDisplaySize(24, 24);
+    } else {
+      yapaBonusIcon = this.add.text(0, 0, "S/", {
+        fontFamily: "Arial",
+        fontSize: "12px",
+        fontStyle: "bold",
+        color: "#5b21b6",
+        backgroundColor: "#2dd4bf"
+      })
+        .setOrigin(0.5, 0.5)
+        .setPadding(4, 1, 4, 1)
+        .setDepth(83)
+        .setVisible(false);
+      yapaBonusIcon.setStroke("#ecfeff", 1);
+    }
+
+    this.uiCam.ignore([rewardGoldIcon, rewardExpIcon, yapaBonusIcon]);
 
     const onCollect = (pointer) => {
       this.uiGuard(pointer);
@@ -3565,7 +3868,10 @@ class MainScene extends Phaser.Scene {
       prodBar,
       rewardGoldIcon,
       rewardExpIcon,
+      yapaBonusIcon,
       rewardReady: false,
+      yapaBonusReady: false,
+      yapaBonusExpiresAt: 0,
       glowGfx,
       isBuilt: effBuild <= 0,
       buildSeconds: effBuild,
@@ -3771,6 +4077,7 @@ class MainScene extends Phaser.Scene {
   }
   updateBuildingsTimers() {
     const now = Date.now();
+    this.trySpawnYapaBonus(now);
 
     for (const b of buildings.values()) {
       const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
@@ -3804,6 +4111,8 @@ class MainScene extends Phaser.Scene {
         b.prodBar.clear();
         b.rewardGoldIcon?.setVisible(false);
         b.rewardExpIcon?.setVisible(false);
+        if (b.yapaBonusReady) this.clearBuildingYapaBonus(b);
+        b.yapaBonusIcon?.setVisible(false);
         if (b.sprite) {
           const ghostAlpha = 0.2 + (0.45 * Phaser.Math.Clamp(done, 0, 1));
           this.updateBuildingSpriteVisual(b, ghostAlpha);
@@ -3851,6 +4160,17 @@ class MainScene extends Phaser.Scene {
         b.prodBar.clear();
         b.rewardGoldIcon?.setVisible(false);
         b.rewardExpIcon?.setVisible(false);
+        const yapaValidNoProd = !!(b.yapaBonusReady && now < (b.yapaBonusExpiresAt || 0));
+        if (b.yapaBonusIcon) {
+          b.yapaBonusIcon.setVisible(yapaValidNoProd);
+          if (yapaValidNoProd) {
+            // Para decorativas/sin produccion, mostrar sobre la barra de referencia.
+            b.yapaBonusIcon.setPosition(barX, barY - 28);
+          }
+        }
+        if (b.yapaBonusReady && !yapaValidNoProd) {
+          this.clearBuildingYapaBonus(b);
+        }
         this.updateBuildingInfoModal(b, def, now);
         continue;
       }
@@ -3899,6 +4219,18 @@ class MainScene extends Phaser.Scene {
       if (b.rewardExpIcon) {
         b.rewardExpIcon.setVisible(showReward);
         if (showReward) b.rewardExpIcon.setPosition(barX + 22, barY - 30);
+      }
+
+      const yapaValid = !!(b.yapaBonusReady && now < (b.yapaBonusExpiresAt || 0));
+      if (b.yapaBonusIcon) {
+        b.yapaBonusIcon.setVisible(yapaValid);
+        if (yapaValid) {
+          // mini icono sobre el icono de cobrar
+          b.yapaBonusIcon.setPosition(barX - 22, barY - 44);
+        }
+      }
+      if (b.yapaBonusReady && !yapaValid) {
+        this.clearBuildingYapaBonus(b);
       }
 
       // ===== glow para dorado =====
@@ -4046,7 +4378,27 @@ const config = {
   }
 };
 
-new Phaser.Game(config);
+const bootGame = () => new Phaser.Game(config);
+if (typeof document !== "undefined" && document.fonts?.load) {
+  Promise.all([document.fonts.load('16px "Arial"'), document.fonts.load('16px "Melon Pop"')]).then(bootGame).catch(bootGame);
+} else {
+  bootGame();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

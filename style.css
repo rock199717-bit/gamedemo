@@ -1,3 +1,13 @@
+@font-face {
+  font-family: "Melon Pop";
+  src: url("./font/Melon Pop.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --font-ui: Arial, sans-serif;
+}
+
 html, body {
   margin: 0;
   width: 100%;
@@ -5,12 +15,14 @@ html, body {
   background: #020617;
   overflow: hidden;
   touch-action: none;
+  font-family: var(--font-ui);
 }
 
 /* contenedor del juego */
 #game {
   width: 100vw;
   height: 100vh;
+  position: relative;
   background-color: #020617;
 
   border-radius: 12px;
@@ -40,10 +52,12 @@ html, body {
     justify-content: center;
     color: #e5e7eb;
     background: rgba(2,6,23,.85);
-    font-family: Arial, sans-serif;
+    font-family: var(--font-ui);
     font-size: 18px;
     text-align: center;
     padding: 24px;
     z-index: 999999;
   }
 }
+
+
