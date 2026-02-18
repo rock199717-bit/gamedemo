@@ -153,6 +153,70 @@
   border-color: rgba(139,92,246,.55);
 }
 
+.admin-card{
+  width: min(720px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.admin-road-panel{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148,163,184,.18);
+}
+
+.admin-road-head{
+  display: grid;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.admin-road-title{
+  font-size: 13px;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.admin-road-sub{
+  font-size: 11px;
+  opacity: .8;
+}
+
+.admin-road-list{
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-road-btn{
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 7px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-road-btn:hover{
+  filter: brightness(1.08);
+}
+
+.admin-road-btn.is-active{
+  border-color: rgba(245,158,11,.8);
+  box-shadow: 0 0 0 1px rgba(245,158,11,.3) inset;
+  color: #fde68a;
+}
+
+.admin-road-btn.admin-road-auto{
+  border-color: rgba(45,212,191,.6);
+  color: #99f6e4;
+}
+
 /* ===== YAPA RAIL (lado izquierdo, estilo city-like) ===== */
 .yapa-rail{
   position: absolute;
@@ -1281,6 +1345,8 @@
   .gacha-log { min-height: 36px; }
   .inv-card { width: min(520px, 96vw); padding: 10px; }
   .inv-title { font-size: 16px; }
+  .admin-card { width: min(96vw, 720px); }
+  .admin-road-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   /* Gacha HTML modal (creado en JS) */
   #gacha-modal .gacha-window {
     width: 96vw !important;

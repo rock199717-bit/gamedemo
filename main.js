@@ -17,6 +17,9 @@ const WORLD_TILE_GRASS_COLOR = 0x84c253;
 const WORLD_BG_GRID_LINE_COLOR = 0x5e8f3c;
 const WORLD_GRID_LINE_COLOR = 0x6ea646;
 const WORLD_MAP_BORDER_COLOR = 0x4f7f2b;
+const ROADKOTO_PIECES = 45;
+const ROADKOTO_ISO_CHILD_ANGLE = 45;
+const ROADKOTO_ISO_PARENT_SCALE_Y = 0.5;
 
 // =========================
 // DECOR AURA (Casa Decorativa green_1)
@@ -41,6 +44,17 @@ const BUILDING_TYPES = {
     fill: 0x22c55e,
     border: 0x22c55e,
     buildSeconds: 5,
+    prodSeconds: 0,
+    reward: { exp: 0, gold: 0 },
+    glow: false
+  },
+  road_main_2x2: {
+    key: "road_main_2x2",
+    label: "Carretera 2x2",
+    size: 2,
+    fill: 0x6b7280,
+    border: 0x9ca3af,
+    buildSeconds: 0,
     prodSeconds: 0,
     reward: { exp: 0, gold: 0 },
     glow: false
@@ -242,6 +256,41 @@ const YAPA_BONUS_INTERVAL_MS = 15 * 60 * 1000; // cada 15 min
 const YAPA_BONUS_DURATION_MS = 60 * 1000;      // dura 1 min
 const YAPA_BONUS_CHANCE = 0.0002;              // 0.02%
 
+// =========================
+// TRAFICO / NPC (placeholder)
+// =========================
+const TRAFFIC_ENABLE_CARS = false;
+const TRAFFIC_MAX_CARS = 6;
+const TRAFFIC_MAX_NPCS = 14;
+const TRAFFIC_CAR_SPEED_TILES = 1.65;
+const TRAFFIC_NPC_SPEED_TILES = 0.56;
+const TRAFFIC_NPC_SIDE_OFFSET_TILES = 0;
+const TRAFFIC_NPC_BLOCKED_SIDE_OFFSET_TILES = 0;
+const TRAFFIC_NPC_SIDE_LERP = 0.18;
+const TRAFFIC_NPC_DIR_LERP = 0.22;
+const TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN = 0.06;
+const TRAFFIC_NPC_OCCLUSION_SCAN_RANGE = 2;
+const TRAFFIC_NPC_OCCLUSION_FRONT_EPS = 0.12;
+const TRAFFIC_NPC_CROSS_WAIT_MIN_MS = 900;
+const TRAFFIC_NPC_CROSS_WAIT_MAX_MS = 2200;
+const TRAFFIC_CAR_NEAR_RADIUS_TILES = 2.4;
+const TRAFFIC_NPC_SIDE_SWITCH_TIMEOUT_MS = 2600;
+const TRAFFIC_NPC_STUCK_REPATH_MS = 2400;
+const TRAFFIC_NPC_STUCK_EPS_TILES = 0.025;
+const TRAFFIC_NPC_OFFROAD_GRACE_MS = 260;
+const TRAFFIC_NPC_SCREEN_LERP = 0.26;
+const TRAFFIC_NPC_TURN_PAUSE_MIN_MS = 180;
+const TRAFFIC_NPC_TURN_PAUSE_MAX_MS = 320;
+const TRAFFIC_NPC_BACK_COLOR = 0xef4444;
+const TRAFFIC_NPC_BASE_COLORS = [
+  0x60a5fa, // azul
+  0x34d399, // verde
+  0xfbbf24, // amarillo
+  0xa78bfa, // morado
+  0x22d3ee, // celeste
+  0xf59e0b  // naranja
+];
+
 // 0 = libre, >0 = id edificio
 const grid = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(0));
 let nextBuildingId = 1;
@@ -348,6 +397,10 @@ class MainScene extends Phaser.Scene {
     this.load.image("green_house_1x1_giro1", "img/green_casa1x1_giro1.png");
     this.load.image("green_house_1x1_giro2", "img/green_casa1x1_giro2.png");
     this.load.image("green_house_1x1_giro3", "img/green_casa1x1_giro3.png");
+    for (let i = 1; i <= ROADKOTO_PIECES; i++) {
+      const id = String(i).padStart(2, "0");
+      this.load.image(`roadkoto_${id}`, `img/roadkoto-${id}.jpg`);
+    }
   }
 
   create() {
@@ -414,8 +467,24 @@ class MainScene extends Phaser.Scene {
     this.yapaScanMode = false;
     // [OK] item seleccionado para construir (por defecto el verde 1x1)
     this.selectedBuildKey = "green_1";
+    this.buildRotationStep = 0;
+    this.buildPreviewTypeKey = this.selectedBuildKey;
     this.nextYapaBonusAt = Date.now() + YAPA_BONUS_INTERVAL_MS;
     this.activeYapaBonusBuildingId = null;
+    this.trafficCars = [];
+    this.streetNpcs = [];
+    this.npcDebugEnabled = false;
+    this.gridCodeDebugEnabled = false;
+    this.gridCodeTextPool = [];
+    this.itemDirDebugEnabled = false;
+    this.itemDirDebugTextPool = [];
+    this.itemDirDebugLastDrawAt = 0;
+    this.roadPieceDebugEnabled = false;
+    this.roadPieceDebugTextPool = [];
+    this.roadPieceDebugLastDrawAt = 0;
+    this.adminForcedRoadPiece = 0;
+    this.nextTrafficCarId = 1;
+    this.nextStreetNpcId = 1;
 
     // lista de objetos UI para que el WORLD cam los ignore (asi NO se mueven con zoom)
     this.uiObjects = [];
@@ -440,6 +509,71 @@ class MainScene extends Phaser.Scene {
         { fontFamily: "Arial", fontSize: "14px", color: "#94a3b8" }
       ).setScrollFactor(0).setDepth(9999)
     );
+    this.npcDebugBtn = regUI(
+      this.add.text(
+        16, 88,
+        "NPC DBG: OFF",
+        { fontFamily: "Arial", fontSize: "14px", color: "#bfdbfe", backgroundColor: "#0f172a" }
+      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
+        .setInteractive({ useHandCursor: true })
+    );
+    this.npcDebugBtn.on("pointerdown", (pointer) => {
+      this.uiGuard(pointer);
+      this.npcDebugEnabled = !this.npcDebugEnabled;
+      this.npcDebugBtn.setText(this.npcDebugEnabled ? "NPC DBG: ON" : "NPC DBG: OFF");
+      if (!this.npcDebugEnabled) this.npcDebugGfx?.clear();
+      this.updateBottomHintLayout();
+    });
+    this.gridCodeBtn = regUI(
+      this.add.text(
+        16, 116,
+        "GRID DBG: OFF",
+        { fontFamily: "Arial", fontSize: "14px", color: "#bbf7d0", backgroundColor: "#0f172a" }
+      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
+        .setInteractive({ useHandCursor: true })
+    );
+    this.gridCodeBtn.on("pointerdown", (pointer) => {
+      this.uiGuard(pointer);
+      this.gridCodeDebugEnabled = !this.gridCodeDebugEnabled;
+      this.gridCodeBtn.setText(this.gridCodeDebugEnabled ? "GRID DBG: ON" : "GRID DBG: OFF");
+      if (this.gridCodeDebugEnabled) this.drawGridCodeOverlay(true);
+      else this.clearGridCodeOverlay();
+      this.updateBottomHintLayout();
+    });
+    this.itemDirDebugBtn = regUI(
+      this.add.text(
+        16, 116,
+        "ITEM NESO: OFF",
+        { fontFamily: "Arial", fontSize: "14px", color: "#fde68a", backgroundColor: "#0f172a" }
+      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
+        .setInteractive({ useHandCursor: true })
+    );
+    this.itemDirDebugBtn.on("pointerdown", (pointer) => {
+      this.uiGuard(pointer);
+      this.itemDirDebugEnabled = !this.itemDirDebugEnabled;
+      this.itemDirDebugBtn.setText(this.itemDirDebugEnabled ? "ITEM NESO: ON" : "ITEM NESO: OFF");
+      this.itemDirDebugLastDrawAt = 0;
+      if (this.itemDirDebugEnabled) this.drawItemDirectionOverlay(true);
+      else this.clearItemDirectionOverlay();
+      this.updateBottomHintLayout();
+    });
+    this.roadPieceDebugBtn = regUI(
+      this.add.text(
+        16, 146,
+        "ROAD NUM: OFF",
+        { fontFamily: "Arial", fontSize: "14px", color: "#fca5a5", backgroundColor: "#0f172a" }
+      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
+        .setInteractive({ useHandCursor: true })
+    );
+    this.roadPieceDebugBtn.on("pointerdown", (pointer) => {
+      this.uiGuard(pointer);
+      this.roadPieceDebugEnabled = !this.roadPieceDebugEnabled;
+      this.roadPieceDebugBtn.setText(this.roadPieceDebugEnabled ? "ROAD NUM: ON" : "ROAD NUM: OFF");
+      this.roadPieceDebugLastDrawAt = 0;
+      if (this.roadPieceDebugEnabled) this.drawRoadPieceDebugOverlay(true);
+      else this.clearRoadPieceDebugOverlay();
+      this.updateBottomHintLayout();
+    });
     this.updateBottomHintLayout();
 
     // crea botones UI (los registra adentro)
@@ -447,6 +581,17 @@ class MainScene extends Phaser.Scene {
     this.createCancelSelectButton(regUI);
     this.createConfirmButtons(regUI);
     this.createActionButtons(regUI);
+
+    this.npcDebugGfx = this.add.graphics().setDepth(34);
+    this.uiCam.ignore(this.npcDebugGfx);
+    this.gridCodeLayer = this.add.layer().setDepth(33);
+    this.uiCam.ignore(this.gridCodeLayer);
+    this.itemDirDebugGfx = this.add.graphics().setDepth(35);
+    this.itemDirDebugLayer = this.add.layer().setDepth(36);
+    this.uiCam.ignore(this.itemDirDebugGfx);
+    this.uiCam.ignore(this.itemDirDebugLayer);
+    this.roadPieceDebugLayer = this.add.layer().setDepth(37);
+    this.uiCam.ignore(this.roadPieceDebugLayer);
 
     // [OK] IMPORTANTISIMO:
     // el WORLD cam ignora todos los UI -> el UI no se escala con zoom
@@ -461,6 +606,9 @@ class MainScene extends Phaser.Scene {
 
     // [OK] Controles de zoom (rueda + pinch)
     this.setupZoomControls();
+
+    // Algunas carreteras base para empezar el mapa.
+    this.placeStarterRoads();
 
     // Grid inicial (doble draw para que se vea al entrar)
     this.lastCamX = this.worldCam.scrollX;
@@ -480,6 +628,10 @@ class MainScene extends Phaser.Scene {
       if (this.hasBlockingDomOverlay()) return;
       if (pointer.y <= 140) return;
 
+      const isRightClick = (pointer?.event?.button === 2);
+      if (isRightClick) {
+        return;
+      }
       this.isDragging = false;
       this.dragged = false;
 
@@ -548,7 +700,7 @@ class MainScene extends Phaser.Scene {
 
       const preview = this.getBuildPreview();
       const size = preview.size;
-      const ok = canPlace(size, tile.r, tile.c);
+      const ok = this.canPlaceBuildAt(preview.typeKey, size, tile.r, tile.c);
       const okColor = preview.def.fill ?? 0x22c55e;
       const okBorder = preview.def.border ?? okColor;
       const badColor = 0xf87171;
@@ -563,7 +715,7 @@ class MainScene extends Phaser.Scene {
       this.drawBuffAreaGhostForPlacement(preview.typeKey, tile.r, tile.c, size, 0);
 
       if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
-        this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
+        this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, preview.rotationStep || 0, tile.r, tile.c, ok ? 0.55 : 0.42);
       } else {
         this.ghostSprite?.setVisible(false);
       }
@@ -577,6 +729,13 @@ class MainScene extends Phaser.Scene {
       if (this.overUI) return;
       if (this.hasBlockingDomOverlay()) return;
 
+      const isRightClick = (pointer?.event?.button === 2);
+      if (isRightClick) {
+        if (mode === "build" && !this.moveMode && !this.selectedBuildingId) {
+          this.rotateBuildPreview();
+        }
+        return;
+      }
       if (pointer.y <= 140) return;
       if (this.dragged) return;
 
@@ -628,21 +787,32 @@ class MainScene extends Phaser.Scene {
 
       const preview = this.getBuildPreview();
       const size = preview.size;
-      const ok = canPlace(size, tile.r, tile.c);
+      const ok = this.canPlaceBuildAt(preview.typeKey, size, tile.r, tile.c);
+
+      // Auto-colocar carretera: instantaneo y sin confirmacion.
+      if (preview.typeKey === "road_main_2x2") {
+        if (ok) this.placeBuilding(tile.r, tile.c);
+        return;
+      }
+
       this.pending = {
         tile,
+        typeKey: preview.typeKey,
         size,
         ok,
         clickX: pointer.x,
         clickY: pointer.y,
         color: preview.def.fill ?? 0x22c55e,
-        border: preview.def.border ?? (preview.def.fill ?? 0x22c55e)
+        border: preview.def.border ?? (preview.def.fill ?? 0x22c55e),
+        rotationStep: preview.rotationStep || 0
       };
 
       this.renderPendingGhost();
       this.updateConfirmButtonsPosition();
       this.showConfirmButtons(ok);
     });
+
+    this.setupBuildHotkeys();
   }
 
   update() {
@@ -689,6 +859,22 @@ class MainScene extends Phaser.Scene {
 
     if (this.pending) this.updateConfirmButtonsPosition();
     if (this.selectedBuildingId) this.updateActionButtonsPosition();
+    this.updateTrafficSystem(this.game?.loop?.delta || 16);
+    this.drawNpcDebugOverlay();
+    if (this.itemDirDebugEnabled) {
+      const nowDbg = Date.now();
+      if ((nowDbg - (this.itemDirDebugLastDrawAt || 0)) >= 120) {
+        this.drawItemDirectionOverlay();
+        this.itemDirDebugLastDrawAt = nowDbg;
+      }
+    }
+    if (this.roadPieceDebugEnabled) {
+      const nowRoadDbg = Date.now();
+      if ((nowRoadDbg - (this.roadPieceDebugLastDrawAt || 0)) >= 120) {
+        this.drawRoadPieceDebugOverlay();
+        this.roadPieceDebugLastDrawAt = nowRoadDbg;
+      }
+    }
 
     // [OK] AQUI:
     this.updateBuildingsTimers();
@@ -878,13 +1064,2055 @@ class MainScene extends Phaser.Scene {
     const baseY = Math.max(150, h - 76);
     if (this.helpText?.setPosition) this.helpText.setPosition(16, baseY);
     if (this.modeText?.setPosition) this.modeText.setPosition(16, baseY + 28);
+    const rowY = baseY + 56;
+    let nextX = 16;
+    if (this.npcDebugBtn?.setPosition) {
+      this.npcDebugBtn.setPosition(nextX, rowY);
+      nextX += (this.npcDebugBtn.width || 110) + 10;
+    }
+    if (this.gridCodeBtn?.setPosition) {
+      this.gridCodeBtn.setPosition(nextX, rowY);
+      nextX += (this.gridCodeBtn.width || 130) + 10;
+    }
+    if (this.itemDirDebugBtn?.setPosition) {
+      this.itemDirDebugBtn.setPosition(nextX, rowY);
+      nextX += (this.itemDirDebugBtn.width || 130) + 10;
+    }
+    if (this.roadPieceDebugBtn?.setPosition) {
+      this.roadPieceDebugBtn.setPosition(16, rowY + 32);
+    }
   }
 
   getBuildPreview() {
     const typeKey = this.selectedBuildKey || "green_1";
+    if (this.buildPreviewTypeKey !== typeKey) {
+      this.buildPreviewTypeKey = typeKey;
+      this.buildRotationStep = 0;
+    }
     const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
     const size = def.size;
-    return { typeKey, def, size };
+    const rawStep = Number.isFinite(this.buildRotationStep) ? this.buildRotationStep : 0;
+    const rotationStep = this.canRotateBuilding(typeKey)
+      ? (((rawStep % 4) + 4) % 4)
+      : 0;
+    return { typeKey, def, size, rotationStep };
+  }
+
+  requiresAdjacentRoadForPlacement(typeKey) {
+    // Casas que spawnean NPC: requieren pista adyacente para poder construirse.
+    return typeKey === "green_1";
+  }
+
+  hasAdjacentRoadAroundArea(r0, c0, size) {
+    for (let r = r0; r < r0 + size; r++) {
+      if (this.isRoadCell(r, c0 - 1)) return true;
+      if (this.isRoadCell(r, c0 + size)) return true;
+    }
+    for (let c = c0; c < c0 + size; c++) {
+      if (this.isRoadCell(r0 - 1, c)) return true;
+      if (this.isRoadCell(r0 + size, c)) return true;
+    }
+    return false;
+  }
+
+  canPlaceBuildAt(typeKey, size, r0, c0) {
+    if (!canPlace(size, r0, c0)) return false;
+    if (!this.requiresAdjacentRoadForPlacement(typeKey)) return true;
+    return this.hasAdjacentRoadAroundArea(r0, c0, size);
+  }
+
+  getHouseSpawnFacing(typeKey, rotationStep = 0) {
+    const step = (((rotationStep || 0) % 4) + 4) % 4;
+    if (typeKey === "green_1") {
+      // Mapeo pedido por diseño:
+      // 0(normal): abajo-derecha
+      // 1(giro1):  abajo-izquierda
+      // 2(giro2):  arriba-izquierda
+      // 3(giro3):  arriba-derecha
+      if (step === 0) return { dr: 0, dc: 1 };
+      if (step === 1) return { dr: 1, dc: 0 };
+      if (step === 2) return { dr: 0, dc: -1 };
+      return { dr: -1, dc: 0 };
+    }
+    return { dr: 0, dc: 1 };
+  }
+
+  getHouseSpawnDirectionPriority(typeKey, rotationStep = 0) {
+    const fwd = this.getHouseSpawnFacing(typeKey, rotationStep);
+    const left = { dr: -fwd.dc, dc: fwd.dr };
+    const right = { dr: fwd.dc, dc: -fwd.dr };
+    const back = { dr: -fwd.dr, dc: -fwd.dc };
+    return [fwd, left, right, back];
+  }
+
+  placeStarterRoads() {
+    const prevBuildKey = this.selectedBuildKey;
+    const prevMode = mode;
+
+    this.selectedBuildKey = "road_main_2x2";
+
+    // Patron simple en cruz cerca del centro para que ya existan carreteras base.
+    const r0 = MAP_CENTER_R - 6;
+    const c0 = MAP_CENTER_C - 6;
+    const coords = [];
+
+    for (let i = 0; i < 7; i++) {
+      coords.push({ r: r0 + (i * 2), c: c0 + 6 });
+    }
+    for (let i = 0; i < 7; i++) {
+      coords.push({ r: r0 + 6, c: c0 + (i * 2) });
+    }
+
+    for (const t of coords) {
+      if (canPlace(2, t.r, t.c)) this.placeBuilding(t.r, t.c);
+    }
+
+    this.selectedBuildKey = prevBuildKey;
+    mode = prevMode;
+  }
+
+  tileKey(r, c) {
+    return `${r},${c}`;
+  }
+
+  parseTileKey(key) {
+    const parts = String(key || "").split(",");
+    return {
+      r: Number(parts[0]) || 0,
+      c: Number(parts[1]) || 0
+    };
+  }
+
+  isRoadBuilding(b) {
+    return !!(b && b.isBuilt && b.typeKey === "road_main_2x2");
+  }
+
+  isRoadCell(r, c) {
+    if (!inBounds(r, c)) return false;
+    const id = grid[r][c];
+    if (!id) return false;
+    const b = buildings.get(id);
+    return this.isRoadBuilding(b);
+  }
+
+  normalizeRoadBuildingState(b, redraw = false) {
+    if (!b || b.typeKey !== "road_main_2x2") return false;
+    const def = BUILDING_TYPES.road_main_2x2;
+    let changed = false;
+    if ((b.rotationStep || 0) !== 0) {
+      b.rotationStep = 0;
+      changed = true;
+    }
+    if (b.border !== def.border) {
+      b.border = def.border;
+      changed = true;
+    }
+    if (redraw) this.redrawRoadBuildingVisual(b);
+    return changed;
+  }
+
+  getRoadBuildingIdsAroundCells(cells, padding = 1) {
+    const ids = new Set();
+    if (!Array.isArray(cells) || !cells.length) return ids;
+
+    for (const cell of cells) {
+      for (let rr = cell.r - padding; rr <= cell.r + padding; rr++) {
+        for (let cc = cell.c - padding; cc <= cell.c + padding; cc++) {
+          if (!inBounds(rr, cc)) continue;
+          const id = grid[rr][cc];
+          if (!id) continue;
+          const b = buildings.get(id);
+          if (this.isRoadBuilding(b)) ids.add(id);
+        }
+      }
+    }
+    return ids;
+  }
+
+  refreshRoadVisualsAroundCells(cells, padding = 1) {
+    const ids = this.getRoadBuildingIdsAroundCells(cells, padding);
+
+    // Expandir 1 salto mas: cuando cambia un vecino, puede afectar al vecino del vecino.
+    const firstWaveCells = [];
+    for (const id of ids) {
+      const b = buildings.get(id);
+      if (!b?.cells?.length) continue;
+      for (const t of b.cells) firstWaveCells.push({ r: t.r, c: t.c });
+    }
+    const expandedIds = this.getRoadBuildingIdsAroundCells(firstWaveCells, 1);
+    for (const id of expandedIds) ids.add(id);
+
+    // Dos pasadas para estabilizar reglas que dependen de la pieza de vecinos.
+    for (let pass = 0; pass < 2; pass++) {
+      for (const id of ids) {
+        const b = buildings.get(id);
+        this.redrawRoadBuildingVisual(b);
+      }
+    }
+  }
+
+  getRoadKotoTextureKey(index) {
+    const n = Phaser.Math.Clamp(Math.round(Number(index) || 1), 1, ROADKOTO_PIECES);
+    return `roadkoto_${String(n).padStart(2, "0")}`;
+  }
+
+  getRoadTopLeftCell(b) {
+    if (!b?.cells?.length) return null;
+    let minR = Infinity;
+    let minC = Infinity;
+    for (const t of b.cells) {
+      if (t.r < minR) minR = t.r;
+      if (t.c < minC) minC = t.c;
+    }
+    if (!Number.isFinite(minR) || !Number.isFinite(minC)) return null;
+    return { r: minR, c: minC };
+  }
+
+  getRoadPieceFromTextureKey(texKey) {
+    const m = /^roadkoto_(\d{2})$/.exec(String(texKey || ""));
+    if (!m) return 0;
+    return Phaser.Math.Clamp(parseInt(m[1], 10) || 0, 0, ROADKOTO_PIECES);
+  }
+
+  getRoadCurrentPieceNumber(b) {
+    if (!b || b.typeKey !== "road_main_2x2") return 0;
+
+    // El numero ROAD debe corresponder al JPG que se esta viendo.
+    const texPiece = this.getRoadPieceFromTextureKey(b.roadSpriteImg?.texture?.key);
+    if (texPiece > 0) return texPiece;
+
+    const forcedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadForcedPiece) || 0), 0, ROADKOTO_PIECES);
+    if (forcedPiece > 0) return forcedPiece;
+
+    const resolvedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadResolvedPiece) || 0), 0, ROADKOTO_PIECES);
+    if (resolvedPiece > 0) return resolvedPiece;
+
+    return 0;
+  }
+
+  getRoadTopLeftParityKey(r, c) {
+    return `${(r & 1)}:${(c & 1)}`;
+  }
+
+  isRoadBlockAlignedWith(r0, c0, b) {
+    if (!b || b.typeKey !== "road_main_2x2") return false;
+    const topLeft = this.getRoadTopLeftCell(b);
+    if (!topLeft) return false;
+    return this.getRoadTopLeftParityKey(r0, c0) === this.getRoadTopLeftParityKey(topLeft.r, topLeft.c);
+  }
+
+  getRoadNeighborBuildingAtSide(r0, c0, side) {
+    const candidates = (side === "N")
+      ? [{ r: r0 - 1, c: c0 }, { r: r0 - 1, c: c0 + 1 }]
+      : (side === "E")
+        ? [{ r: r0, c: c0 + 2 }, { r: r0 + 1, c: c0 + 2 }]
+        : (side === "S")
+          ? [{ r: r0 + 2, c: c0 }, { r: r0 + 2, c: c0 + 1 }]
+          : [{ r: r0, c: c0 - 1 }, { r: r0 + 1, c: c0 - 1 }];
+
+    for (const p of candidates) {
+      if (!inBounds(p.r, p.c)) continue;
+      const b = this.getBuildingAtCell(p.r, p.c);
+      if (this.isRoadBlockAlignedWith(r0, c0, b)) return b;
+    }
+    return null;
+  }
+
+  getRoadNeighborPieceBySide(r0, c0, side) {
+    const b = this.getRoadNeighborBuildingAtSide(r0, c0, side);
+    if (!b) return 0;
+    return this.getRoadCurrentPieceNumber(b);
+  }
+
+  getRoadSpecialPieceByNeighborRoads(mask, r0, c0) {
+    const m = (mask & 15);
+
+    const centerRoad = this.getBuildingAtCell(r0, c0);
+    if (!centerRoad || centerRoad.typeKey !== "road_main_2x2") return 0;
+
+    const centerPiece = this.getRoadCurrentPieceNumber(centerRoad);
+    const n = this.getRoadNeighborPieceBySide(r0, c0, "N");
+    const e = this.getRoadNeighborPieceBySide(r0, c0, "E");
+    const s = this.getRoadNeighborPieceBySide(r0, c0, "S");
+    const w = this.getRoadNeighborPieceBySide(r0, c0, "W");
+    const diagMask = this.getRoadDiagonalMaskForBlock(r0, c0);
+
+    const hasN = n > 0;
+    const hasE = e > 0;
+    const hasS = s > 0;
+    const hasW = w > 0;
+    const hasNW = (diagMask & 1) !== 0;
+    const hasNE = (diagMask & 2) !== 0;
+    const hasSE = (diagMask & 4) !== 0;
+    const hasSW = (diagMask & 8) !== 0;
+
+    // Regla exacta solicitada: ROAD 19 con O=1 y N=2 + nueva pieza en NO.
+    // Resultado forzado: ROAD 1 -> 45, ROAD 2 -> 40, ROAD 19 -> 36.
+    if ((centerPiece === 19 || centerPiece === 36) && hasNW && (w === 1 || w === 45) && (n === 2 || n === 40)) return 36;
+    if ((centerPiece === 1 || centerPiece === 45) && hasN && (e === 19 || e === 36)) return 45;
+    if ((centerPiece === 2 || centerPiece === 40) && hasW && (s === 19 || s === 36)) return 40;
+
+    // Variantes diagonales (NO/NE/SE/SO) para ROAD 1, ROAD 2 y esquinas 17/18/19/20.
+    if (centerPiece === 1 || centerPiece === 42 || centerPiece === 43 || centerPiece === 44 || centerPiece === 45) {
+      if (hasN && hasE && !hasS && !hasW) return 45; // N+E
+      if (hasN && hasW && !hasS && !hasE) return 42; // N+O
+      if (hasS && hasE && !hasN && !hasW) return 43; // S+E
+      if (hasS && hasW && !hasN && !hasE) return 44; // S+O
+    }
+    if (centerPiece === 2 || centerPiece === 38 || centerPiece === 39 || centerPiece === 40 || centerPiece === 41) {
+      if (hasS && hasW && !hasN && !hasE) return 40; // S+O
+      if (hasS && hasE && !hasN && !hasW) return 41; // S+E
+      if (hasN && hasW && !hasS && !hasE) return 38; // N+O
+      if (hasN && hasE && !hasS && !hasW) return 39; // N+E
+    }
+    if ((centerPiece === 19 || centerPiece === 36) && hasW && hasN && hasNW) return 36; // esquina NO
+    if ((centerPiece === 20 || centerPiece === 37) && hasN && hasE && hasNE) return 37; // esquina NE
+    if ((centerPiece === 17 || centerPiece === 34) && hasE && hasS && hasSE) return 34; // esquina SE
+    if ((centerPiece === 18 || centerPiece === 35) && hasS && hasW && hasSW) return 35; // esquina SO
+
+
+    // Transiciones directas solicitadas por diseno (basadas en pieza actual).
+    if (centerPiece === 5) {
+      if (hasN && hasS) return 10;  // ROAD 5 + N + S
+      if (hasN && !hasS) return 20; // ROAD 5 + N
+      if (hasS && !hasN) return 17; // ROAD 5 + S
+    }
+    if (centerPiece === 20 && hasS) return 10; // ROAD 20 + S
+    if (centerPiece === 17 && hasN) return 10; // ROAD 17 + N
+
+
+    if (centerPiece === 3) {
+      if (hasN && hasS) return 8;  // ROAD 3 + N + S
+      if (hasS) return 18;         // ROAD 3 + S
+      if (hasN) return 19;         // ROAD 3 + N
+    }
+
+    if (centerPiece === 19 && hasS) return 18; // ROAD 19 + S
+    if (centerPiece === 19 && hasE && hasN && !hasS) return 20; // ROAD 19 puente -> 20
+
+    if (centerPiece === 18) {
+      if (hasE) return 11;         // ROAD 18 + E
+      if (hasN) return 8;          // ROAD 18 + N
+    }
+
+    if (centerPiece === 8 && hasE) return 11;  // ROAD 8 + E
+    if (centerPiece === 10 && hasW) return 11; // ROAD 10 + O
+
+    // Evitar que una segunda pasada pise ROAD 11 con variantes de cruce.
+    if (centerPiece === 11 && m === 15) return 11;
+
+    if (m !== 15) return 0;
+
+    const ruleA = (w === 1 && e === 1 && n === 2 && s === 2);
+    const ruleB = (w === 5 && e === 3 && (n === 4 || n === 2 || n === 6) && (s === 6 || s === 5 || s === 2 || s === 4));
+    if (ruleA || ruleB) return 11;
+
+    return 0;
+  }
+
+  hasRoadNeighborNorth(r0, c0) {
+    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "N");
+  }
+
+  hasRoadNeighborEast(r0, c0) {
+    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "E");
+  }
+
+  hasRoadNeighborSouth(r0, c0) {
+    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "S");
+  }
+
+  hasRoadNeighborWest(r0, c0) {
+    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "W");
+  }
+
+  getRoadNeighborMaskForBlock(r0, c0) {
+    let mask = 0;
+    if (this.hasRoadNeighborNorth(r0, c0)) mask |= 1;
+    if (this.hasRoadNeighborEast(r0, c0)) mask |= 2;
+    if (this.hasRoadNeighborSouth(r0, c0)) mask |= 4;
+    if (this.hasRoadNeighborWest(r0, c0)) mask |= 8;
+    return mask;
+  }
+
+  getRoadDiagonalMaskForBlock(r0, c0) {
+    let mask = 0;
+    const markIfAlignedRoad = (rr, cc, bit) => {
+      const b = this.getBuildingAtCell(rr, cc);
+      if (this.isRoadBlockAlignedWith(r0, c0, b)) mask |= bit;
+    };
+    markIfAlignedRoad(r0 - 1, c0 - 1, 1); // NW
+    markIfAlignedRoad(r0 - 1, c0 + 2, 2); // NE
+    markIfAlignedRoad(r0 + 2, c0 + 2, 4); // SE
+    markIfAlignedRoad(r0 + 2, c0 - 1, 8); // SW
+    return mask;
+  }
+
+  hashRoadVariant(r0, c0, mask, diagMask) {
+    const a = ((r0 * 73856093) ^ (c0 * 19349663)) >>> 0;
+    const b = (((mask & 15) * 83492791) ^ ((diagMask & 15) * 2654435761)) >>> 0;
+    return (a ^ b) >>> 0;
+  }
+
+  getRoadKotoPieceForMask(mask, diagMask, r0, c0) {
+    const pick = (arr) => {
+      if (!Array.isArray(arr) || !arr.length) return 12;
+      const h = this.hashRoadVariant(r0, c0, mask, diagMask);
+      return arr[h % arr.length];
+    };
+
+    const specialPiece = this.getRoadSpecialPieceByNeighborRoads(mask, r0, c0);
+    if (specialPiece > 0) return { piece: specialPiece, rot: 0 };
+
+    // N=1, E=2, S=4, W=8
+    // Devuelve pieza base + rotacion top-down (antes de proyeccion iso).
+    switch (mask & 15) {
+      case 0: return { piece: 33, rot: 0 }; // aislado
+      // Regla guiada por diseno (conexion de 2 carreteras adyacentes):
+      // solo N -> pieza 6, solo S -> pieza 4, solo E -> pieza 5, solo O -> pieza 3
+      case 1: return { piece: 6, rot: 0 }; // solo N
+      case 2: return { piece: 5, rot: 0 }; // solo E
+      case 4: return { piece: 4, rot: 0 }; // solo S
+      case 8: return { piece: 3, rot: 0 }; // solo O
+      case 5: return { piece: 2, rot: 0 };   // N-S
+      case 10: return { piece: 1, rot: 0 };  // E-W
+      case 3: return { piece: 20, rot: 0 };   // N-E
+      case 6: return { piece: 17, rot: 0 };  // E-S
+      case 12: return { piece: 18, rot: 0 }; // S-W
+      case 9: return { piece: 19, rot: 0 }; // W-N
+      case 11: return { piece: 9, rot: 0 };    // falta N
+      case 13: return { piece: 8, rot: 0 };   // N-S + O
+      case 14: return { piece: 7, rot: 0 };  // T desde ROAD 1 + S
+      case 7: return { piece: 10, rot: 0 };   // N-S + E
+      case 15: return { piece: pick([12, 13, 14, 15, 16, 26, 27, 28, 29, 30, 31, 32, 25]), rot: 0 };
+      default: return { piece: 12, rot: 0 };
+    }
+  }
+
+  ensureRoadKotoSprite(b) {
+    if (!b || b.typeKey !== "road_main_2x2") return null;
+    if (b.roadSprite?.active && b.roadSpriteImg?.active) return b.roadSprite;
+
+    const sprite = this.add.container(0, 0).setVisible(true);
+    const img = this.add.image(0, 0, this.getRoadKotoTextureKey(12))
+      .setOrigin(0.5, 0.5)
+      .setVisible(true);
+    sprite.add(img);
+    this.uiCam.ignore(sprite);
+
+    b.roadSprite = sprite;
+    b.roadSpriteImg = img;
+    return sprite;
+  }
+
+  applyRoadKotoSpriteVisual(b, alpha = 1) {
+    if (!b || b.typeKey !== "road_main_2x2") return false;
+    const topLeft = this.getRoadTopLeftCell(b);
+    if (!topLeft) return false;
+
+    const pieceSel = this.getRoadPieceSelectionForBuilding(b);
+    if (!pieceSel?.piece) return false;
+    const texKey = this.getRoadKotoTextureKey(pieceSel.piece);
+    if (!this.textures?.exists?.(texKey)) return false;
+
+    const roadSprite = this.ensureRoadKotoSprite(b);
+    if (!roadSprite || !b.roadSpriteImg) return false;
+
+    const img = b.roadSpriteImg;
+    if (img.texture?.key !== texKey) img.setTexture(texKey);
+    img.setAlpha(Phaser.Math.Clamp(alpha, 0, 1));
+
+    const source = img.texture?.getSourceImage?.();
+    const texW = Math.max(1, Number(source?.width) || 295);
+    const blockW = TILE_W * 2;
+    const baseScale = blockW / (Math.SQRT2 * texW);
+    img.setScale(baseScale);
+    img.setAngle(ROADKOTO_ISO_CHILD_ANGLE + pieceSel.rot);
+
+    b.roadResolvedPiece = pieceSel.piece;
+    b.roadResolvedRot = pieceSel.rot;
+
+    roadSprite.setScale(1, ROADKOTO_ISO_PARENT_SCALE_Y);
+    const center = isoToScreen(topLeft.r + 0.5, topLeft.c + 0.5);
+    roadSprite.setPosition(Math.round(center.x), Math.round(center.y));
+    roadSprite.setDepth(8 + (center.y * 0.001));
+    roadSprite.setVisible(true);
+    return true;
+  }
+
+  getBuildingAtCell(r, c) {
+    if (!inBounds(r, c)) return null;
+    const id = grid[r][c];
+    if (!id) return null;
+    return buildings.get(id) || null;
+  }
+
+  isBlockedByNonRoadBuilding(r, c) {
+    const b = this.getBuildingAtCell(r, c);
+    if (!b) return false;
+    return !this.isRoadBuilding(b);
+  }
+
+  getNpcSideCell(r, c, dirR, dirC, side = 1) {
+    const perpR = -dirC * side;
+    const perpC = dirR * side;
+    return {
+      r: Math.round(r + perpR),
+      c: Math.round(c + perpC)
+    };
+  }
+
+  isSideBlockedForNpc(r, c, dirR, dirC, side = 1) {
+    if (!dirR && !dirC) return false;
+
+    const perpR = -dirC * side;
+    const perpC = dirR * side;
+    const checks = [];
+    const addCheck = (rr, cc) => {
+      checks.push({ r: Math.round(rr), c: Math.round(cc) });
+      checks.push({ r: Math.floor(rr), c: Math.floor(cc) });
+      checks.push({ r: Math.ceil(rr), c: Math.ceil(cc) });
+    };
+
+    addCheck(r + perpR, c + perpC);
+    addCheck(r + perpR + (dirR * 0.5), c + perpC + (dirC * 0.5));
+    addCheck(r + perpR - (dirR * 0.5), c + perpC - (dirC * 0.5));
+    addCheck(r + perpR + dirR, c + perpC + dirC);
+    addCheck(r + perpR - dirR, c + perpC - dirC);
+
+    const visited = new Set();
+    for (const t of checks) {
+      if (!inBounds(t.r, t.c)) continue;
+      const key = this.tileKey(t.r, t.c);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (this.isBlockedByNonRoadBuilding(t.r, t.c)) return true;
+    }
+    return false;
+  }
+
+  getSafeRoadEdgeSideForNpc(r, c, dirR, dirC, fallback = 1) {
+    if (!dirR && !dirC) return fallback || 1;
+
+    const preferred = this.getPreferredRoadEdgeSide(r, c, dirR, dirC, fallback);
+    if (!this.isSideBlockedForNpc(r, c, dirR, dirC, preferred)) return preferred;
+
+    const opposite = -preferred;
+    if (!this.isSideBlockedForNpc(r, c, dirR, dirC, opposite)) return opposite;
+
+    return preferred;
+  }
+
+  getBuildingRenderDepth(b) {
+    if (!b) return 0;
+    if (Number.isFinite(b?.sprite?.depth)) return b.sprite.depth;
+    const anchor = this.getBuildingAnchor(b);
+    if (!anchor) return 0;
+    return 30 + (anchor.y * 0.01);
+  }
+
+  getBuildingFrontIndex(b) {
+    if (!b?.cells?.length) return -Infinity;
+    let front = -Infinity;
+    for (const cell of b.cells) {
+      const idx = cell.r + cell.c;
+      if (idx > front) front = idx;
+    }
+    return front;
+  }
+
+  getNearbyNonRoadBuildings(r, c, range = TRAFFIC_NPC_OCCLUSION_SCAN_RANGE, limit = 12) {
+    const rr = Math.round(r);
+    const cc = Math.round(c);
+    const out = [];
+    const seen = new Set();
+
+    for (let tr = rr - range; tr <= rr + range; tr++) {
+      for (let tc = cc - range; tc <= cc + range; tc++) {
+        if (!inBounds(tr, tc)) continue;
+        const b = this.getBuildingAtCell(tr, tc);
+        if (!b || this.isRoadBuilding(b)) continue;
+        const id = Number(b.id) || 0;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push(b);
+        if (out.length >= limit) return out;
+      }
+    }
+    return out;
+  }
+
+  clampNpcDepthAgainstNearbyBuildings(baseDepth, r, c) {
+    let outDepth = baseDepth;
+    const npcFrontIndex = r + c;
+    const nearby = this.getNearbyNonRoadBuildings(r, c);
+
+    for (const b of nearby) {
+      const buildingDepth = this.getBuildingRenderDepth(b);
+      if (!(buildingDepth > 0)) continue;
+      const buildingFront = this.getBuildingFrontIndex(b);
+      if (!(buildingFront > -Infinity)) continue;
+
+      // Si el NPC esta "detras" del frente de la casa, siempre va por debajo en depth.
+      if (npcFrontIndex <= (buildingFront + TRAFFIC_NPC_OCCLUSION_FRONT_EPS)) {
+        outDepth = Math.min(outDepth, buildingDepth - TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN);
+      }
+    }
+    return outDepth;
+  }
+
+  getBuiltRoadCells(limit = 6000) {
+    const cells = [];
+    for (const b of buildings.values()) {
+      if (!this.isRoadBuilding(b)) continue;
+      for (const cell of b.cells) {
+        cells.push({ r: cell.r, c: cell.c });
+        if (cells.length >= limit) return cells;
+      }
+    }
+    return cells;
+  }
+
+  pickRandomRoadCell(refCell = null, minDist = 0) {
+    const cells = this.getBuiltRoadCells();
+    if (!cells.length) return null;
+
+    let pool = cells;
+    if (refCell && minDist > 0) {
+      const minDist2 = minDist * minDist;
+      const filtered = cells.filter((t) => {
+        const dr = t.r - refCell.r;
+        const dc = t.c - refCell.c;
+        return ((dr * dr) + (dc * dc)) >= minDist2;
+      });
+      if (filtered.length) pool = filtered;
+    }
+
+    return pool[Math.floor(Math.random() * pool.length)] || null;
+  }
+
+  getNearestRoadCellToPoint(r, c, limit = 6000) {
+    let best = null;
+    let bestD2 = Infinity;
+    let seen = 0;
+
+    for (const b of buildings.values()) {
+      if (!this.isRoadBuilding(b)) continue;
+      for (const cell of b.cells) {
+        const dr = cell.r - r;
+        const dc = cell.c - c;
+        const d2 = (dr * dr) + (dc * dc);
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = { r: cell.r, c: cell.c };
+        }
+        seen++;
+        if (seen >= limit) return best;
+      }
+    }
+    return best;
+  }
+
+  findRoadPath(start, end, maxNodes = 4200) {
+    if (!start || !end) return null;
+    if (!this.isRoadCell(start.r, start.c)) return null;
+    if (!this.isRoadCell(end.r, end.c)) return null;
+
+    const startKey = this.tileKey(start.r, start.c);
+    const endKey = this.tileKey(end.r, end.c);
+    if (startKey === endKey) return [{ r: start.r, c: start.c }];
+
+    const q = [{ r: start.r, c: start.c }];
+    let head = 0;
+    const prev = new Map();
+    prev.set(startKey, null);
+
+    const dirs = [
+      { dr: 1, dc: 0 },
+      { dr: -1, dc: 0 },
+      { dr: 0, dc: 1 },
+      { dr: 0, dc: -1 }
+    ];
+
+    while (head < q.length && prev.size <= maxNodes) {
+      const cur = q[head++];
+      const curKey = this.tileKey(cur.r, cur.c);
+      if (curKey === endKey) break;
+
+      for (const d of dirs) {
+        const nr = cur.r + d.dr;
+        const nc = cur.c + d.dc;
+        if (!this.isRoadCell(nr, nc)) continue;
+        const nk = this.tileKey(nr, nc);
+        if (prev.has(nk)) continue;
+        prev.set(nk, curKey);
+        q.push({ r: nr, c: nc });
+      }
+    }
+
+    if (!prev.has(endKey)) return null;
+
+    const path = [];
+    let k = endKey;
+    while (k) {
+      path.push(this.parseTileKey(k));
+      k = prev.get(k);
+    }
+    path.reverse();
+    return path;
+  }
+
+  getPreferredRoadEdgeSide(r, c, dirR, dirC, fallback = 1) {
+    if (!dirR && !dirC) return fallback || 1;
+
+    // side=1  -> izquierda del movimiento
+    // side=-1 -> derecha del movimiento
+    const leftR = r + (-dirC);
+    const leftC = c + dirR;
+    const rightR = r + dirC;
+    const rightC = c + (-dirR);
+
+    const leftRoad = this.isRoadCell(leftR, leftC);
+    const rightRoad = this.isRoadCell(rightR, rightC);
+    const leftBlocked = this.isSideBlockedForNpc(r, c, dirR, dirC, 1);
+    const rightBlocked = this.isSideBlockedForNpc(r, c, dirR, dirC, -1);
+
+    // Nunca elegir lado que este ocupado por casa/edificio no-carretera.
+    if (leftBlocked && !rightBlocked) return -1;
+    if (rightBlocked && !leftBlocked) return 1;
+
+    // Prioriza caminar pegado al borde donde NO hay carretera.
+    if (!leftRoad && rightRoad) return 1;
+    if (leftRoad && !rightRoad) return -1;
+
+    return fallback || 1;
+  }
+
+  getRoadSideOffsetPixels(r, c, dirR, dirC, side = 1) {
+    if (!dirR && !dirC) return { x: 0, y: 0 };
+    // Regla dura: peatones solo dentro de bloques de pista.
+    // Si por cualquier motivo no estamos sobre una celda de pista, no aplicar offset lateral.
+    if (!this.isRoadCell(Math.round(r), Math.round(c))) return { x: 0, y: 0 };
+    let sideToUse = side >= 0 ? 1 : -1;
+    if (this.isSideBlockedForNpc(r, c, dirR, dirC, sideToUse)
+      && !this.isSideBlockedForNpc(r, c, dirR, dirC, -sideToUse)) {
+      sideToUse = -sideToUse;
+    }
+
+    const perpR = -dirC * sideToUse;
+    const perpC = dirR * sideToUse;
+    const sideCell = this.getNpcSideCell(r, c, dirR, dirC, sideToUse);
+    const sideCellR = sideCell.r;
+    const sideCellC = sideCell.c;
+    // Si ese lado no es pista, mantener al NPC centrado en la pista (sin salirse).
+    if (!this.isRoadCell(sideCellR, sideCellC)) return { x: 0, y: 0 };
+    let offsetTiles = TRAFFIC_NPC_SIDE_OFFSET_TILES;
+
+    // Si ese lado tiene edificio, reduce el offset para no encimarse.
+    if (this.isBlockedByNonRoadBuilding(sideCellR, sideCellC)) {
+      offsetTiles = Math.min(offsetTiles, TRAFFIC_NPC_BLOCKED_SIDE_OFFSET_TILES);
+    }
+
+    const p0 = isoToScreen(r, c);
+    const p1 = isoToScreen(
+      r + (perpR * offsetTiles),
+      c + (perpC * offsetTiles)
+    );
+    return { x: p1.x - p0.x, y: p1.y - p0.y };
+  }
+
+  setTrafficCarScreenPosition(car, r, c, dirR = 0, dirC = 0) {
+    const p = isoToScreen(r, c);
+    const carY = p.y + (TILE_H * 0.12);
+    const tileR = Math.round(r);
+    const tileC = Math.round(c);
+
+    car.r = r;
+    car.c = c;
+    car.sprite.setPosition(Math.round(p.x), Math.round(carY));
+
+    let carDepth = 30.35 + (carY * 0.01);
+    let dirRForSide = dirR ? Math.sign(dirR) : 0;
+    let dirCForSide = dirC ? Math.sign(dirC) : 0;
+    if (!dirRForSide && !dirCForSide) {
+      dirRForSide = 0;
+      dirCForSide = 1;
+    }
+
+    const side = this.getSafeRoadEdgeSideForNpc(tileR, tileC, dirRForSide, dirCForSide, 1);
+    const sideCell = this.getNpcSideCell(tileR, tileC, dirRForSide, dirCForSide, side);
+    const sideBuilding = this.getBuildingAtCell(sideCell.r, sideCell.c);
+    if (sideBuilding && !this.isRoadBuilding(sideBuilding)) {
+      const sideDepth = this.getBuildingRenderDepth(sideBuilding);
+      if (sideDepth > 0) {
+        carDepth = Math.min(carDepth, sideDepth - TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN);
+      }
+    }
+    car.sprite.setDepth(carDepth);
+
+    if (dirR || dirC) {
+      const p2 = isoToScreen(r + dirR, c + dirC);
+      const angle = Phaser.Math.RadToDeg(Math.atan2(p2.y - p.y, p2.x - p.x));
+      car.sprite.setAngle(angle);
+    }
+  }
+
+  setStreetNpcScreenPosition(npc, r, c) {
+    const p = isoToScreen(r, c);
+    const tileR = Math.round(r);
+    const tileC = Math.round(c);
+
+    const targetDirRRaw = Number.isFinite(npc.dirR) ? npc.dirR : 0;
+    const targetDirCRaw = Number.isFinite(npc.dirC) ? npc.dirC : 1;
+    let dirRForSide = targetDirRRaw ? Math.sign(targetDirRRaw) : 0;
+    let dirCForSide = targetDirCRaw ? Math.sign(targetDirCRaw) : 0;
+    if (!dirRForSide && !dirCForSide) {
+      dirRForSide = 0;
+      dirCForSide = 1;
+    }
+
+    let sideForOffset = npc.side || 1;
+    if (npc.side === npc.sideTarget) {
+      const preferredSide = this.getSafeRoadEdgeSideForNpc(
+        tileR,
+        tileC,
+        dirRForSide,
+        dirCForSide,
+        sideForOffset
+      );
+      npc.sideTarget = preferredSide;
+    }
+    if (typeof npc.sideVisual !== "number") {
+      npc.sideVisual = sideForOffset;
+    }
+    npc.sideVisual = Phaser.Math.Linear(npc.sideVisual, npc.sideTarget || sideForOffset, TRAFFIC_NPC_SIDE_LERP);
+    if (Math.abs((npc.sideTarget || sideForOffset) - npc.sideVisual) < 0.02) {
+      npc.sideVisual = npc.sideTarget || sideForOffset;
+    }
+    sideForOffset = npc.sideVisual;
+
+    const sideForChecks = sideForOffset >= 0 ? 1 : -1;
+    if (this.isSideBlockedForNpc(tileR, tileC, dirRForSide, dirCForSide, sideForChecks)) {
+      const safeSide = this.getSafeRoadEdgeSideForNpc(tileR, tileC, dirRForSide, dirCForSide, sideForChecks);
+      npc.side = safeSide;
+      npc.sideTarget = safeSide;
+      npc.sideVisual = safeSide;
+      sideForOffset = safeSide;
+    }
+
+    const targetDirR = targetDirRRaw;
+    const targetDirC = targetDirCRaw;
+    if (typeof npc.dirVisualR !== "number") npc.dirVisualR = targetDirR;
+    if (typeof npc.dirVisualC !== "number") npc.dirVisualC = targetDirC;
+    npc.dirVisualR = Phaser.Math.Linear(npc.dirVisualR, targetDirR, TRAFFIC_NPC_DIR_LERP);
+    npc.dirVisualC = Phaser.Math.Linear(npc.dirVisualC, targetDirC, TRAFFIC_NPC_DIR_LERP);
+    const dirLen = Math.hypot(npc.dirVisualR, npc.dirVisualC);
+    if (dirLen > 0.0001) {
+      npc.dirVisualR /= dirLen;
+      npc.dirVisualC /= dirLen;
+    } else {
+      npc.dirVisualR = 0;
+      npc.dirVisualC = 1;
+    }
+
+    const off = this.getRoadSideOffsetPixels(r, c, dirRForSide, dirCForSide, sideForOffset);
+    const npcY = p.y + (TILE_H * 0.20) + off.y;
+    const targetX = Math.round(p.x + off.x);
+    const targetY = Math.round(npcY);
+    npc.r = r;
+    npc.c = c;
+
+    if (!Number.isFinite(npc.screenX) || !Number.isFinite(npc.screenY)) {
+      npc.screenX = targetX;
+      npc.screenY = targetY;
+    } else {
+      npc.screenX = Phaser.Math.Linear(npc.screenX, targetX, TRAFFIC_NPC_SCREEN_LERP);
+      npc.screenY = Phaser.Math.Linear(npc.screenY, targetY, TRAFFIC_NPC_SCREEN_LERP);
+      if (Math.abs(targetX - npc.screenX) < 0.35) npc.screenX = targetX;
+      if (Math.abs(targetY - npc.screenY) < 0.35) npc.screenY = targetY;
+    }
+    npc.sprite.setPosition(
+      npc.screenX,
+      npc.screenY
+    );
+
+    // Si camina hacia arriba en pantalla, lo tratamos como "de espaldas".
+    const facingScreenDy = (npc.dirVisualR + npc.dirVisualC) * (TILE_H * 0.5);
+    const isBackFacing = facingScreenDy < -0.01;
+    if (npc.isBackFacing !== isBackFacing) {
+      npc.isBackFacing = isBackFacing;
+      npc.sprite.setFillStyle(
+        isBackFacing ? TRAFFIC_NPC_BACK_COLOR : (npc.baseColor || 0xf8fafc),
+        1
+      );
+    }
+
+    let npcDepth = 30.18 + ((Number.isFinite(npc.screenY) ? npc.screenY : npcY) * 0.01);
+    const sideCell = this.getNpcSideCell(r, c, dirRForSide, dirCForSide, sideForOffset >= 0 ? 1 : -1);
+    const sideBuilding = this.getBuildingAtCell(sideCell.r, sideCell.c);
+    if (sideBuilding && !this.isRoadBuilding(sideBuilding)) {
+      const sideDepth = this.getBuildingRenderDepth(sideBuilding);
+      if (sideDepth > 0) {
+        npcDepth = Math.min(npcDepth, sideDepth - TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN);
+      }
+    }
+    npcDepth = this.clampNpcDepthAgainstNearbyBuildings(npcDepth, r, c);
+    npc.sprite.setDepth(npcDepth);
+  }
+
+  hasNearbyCarAt(r, c, radiusTiles = TRAFFIC_CAR_NEAR_RADIUS_TILES) {
+    const rr = Math.max(0, radiusTiles || 0);
+    for (const car of this.trafficCars) {
+      const dr = (car.r || 0) - r;
+      const dc = (car.c || 0) - c;
+      if (Math.hypot(dr, dc) <= rr) return true;
+    }
+    return false;
+  }
+
+  assignStreetNpcRoute(npc, now = Date.now()) {
+    const from = {
+      r: Math.round(npc.r),
+      c: Math.round(npc.c)
+    };
+
+    if (!this.isRoadCell(from.r, from.c)) {
+      const snap = this.getNearestRoadCellToPoint(from.r, from.c);
+      if (!snap) {
+        npc.nextPathAt = now + 1500;
+        return;
+      }
+      from.r = snap.r;
+      from.c = snap.c;
+      this.setStreetNpcScreenPosition(npc, from.r, from.c);
+    }
+
+    let chosenPath = null;
+    for (let i = 0; i < 12; i++) {
+      const target = this.pickRandomRoadCell(from, 4);
+      if (!target) break;
+      const maybe = this.findRoadPath(from, target, 2500);
+      if (maybe && maybe.length >= 2) {
+        chosenPath = maybe;
+        break;
+      }
+    }
+
+    if (!chosenPath) {
+      npc.path = [{ r: from.r, c: from.c }];
+      npc.pathIndex = 0;
+      npc.progress = 0;
+      npc.sideTarget = npc.side || 1;
+      npc.waitUntil = 0;
+      npc.sideSwitchStartAt = 0;
+      npc.turnPauseUntil = 0;
+      npc.turnPauseR = from.r;
+      npc.turnPauseC = from.c;
+      npc.nextPathAt = now + Phaser.Math.Between(900, 1800);
+      return;
+    }
+
+    npc.path = chosenPath;
+    npc.pathIndex = 0;
+    npc.progress = 0;
+    npc.turnPauseUntil = 0;
+    npc.turnPauseR = chosenPath[0].r;
+    npc.turnPauseC = chosenPath[0].c;
+    npc.nextPathAt = now + Phaser.Math.Between(600, 1300);
+    if (chosenPath.length >= 2) {
+      const a = chosenPath[0];
+      const b = chosenPath[1];
+      npc.dirR = b.r - a.r;
+      npc.dirC = b.c - a.c;
+      npc.dirVisualR = npc.dirR;
+      npc.dirVisualC = npc.dirC;
+      npc.side = this.getSafeRoadEdgeSideForNpc(a.r, a.c, npc.dirR, npc.dirC, npc.side || 1);
+      npc.sideTarget = npc.side;
+      npc.sideVisual = npc.side;
+      npc.sideSwitchStartAt = 0;
+    }
+
+    if (Math.random() < 0.32) {
+      const crossCandidate = -npc.side;
+      if (!this.isSideBlockedForNpc(from.r, from.c, npc.dirR, npc.dirC, crossCandidate)) {
+        npc.sideTarget = crossCandidate;
+        npc.waitUntil = now + Phaser.Math.Between(TRAFFIC_NPC_CROSS_WAIT_MIN_MS, TRAFFIC_NPC_CROSS_WAIT_MAX_MS);
+        npc.sideSwitchStartAt = now;
+      } else {
+        npc.sideTarget = npc.side;
+        npc.waitUntil = 0;
+        npc.sideSwitchStartAt = 0;
+      }
+    } else {
+      npc.sideTarget = npc.side;
+      npc.waitUntil = 0;
+      npc.sideSwitchStartAt = 0;
+    }
+  }
+
+  spawnStreetNpcFromCar(car) {
+    if (!car?.targetRoad) return;
+    if (this.streetNpcs.length >= TRAFFIC_MAX_NPCS) return;
+
+    const baseColor = Phaser.Utils.Array.GetRandom(TRAFFIC_NPC_BASE_COLORS) || 0xf8fafc;
+    const sprite = this.add.circle(0, 0, 5, baseColor, 1)
+      .setStrokeStyle(2, 0x0f172a, 0.95)
+      .setAlpha(0)
+      .setDepth(69);
+    this.uiCam.ignore(sprite);
+
+    const npc = {
+      id: this.nextStreetNpcId++,
+      sprite,
+      baseColor,
+      isBackFacing: false,
+      r: car.targetRoad.r,
+      c: car.targetRoad.c,
+      path: null,
+      pathIndex: 0,
+      progress: 0,
+      speed: TRAFFIC_NPC_SPEED_TILES,
+      dirR: 0,
+      dirC: 1,
+      dirVisualR: 0,
+      dirVisualC: 1,
+      side: Math.random() < 0.5 ? -1 : 1,
+      sideTarget: 0,
+      sideVisual: 0,
+      waitUntil: 0,
+      nextPathAt: Date.now() + Phaser.Math.Between(200, 800),
+      homeBuildingId: car.targetHouseId,
+      sideSwitchStartAt: 0,
+      lastMoveAt: Date.now(),
+      lastMoveR: car.targetRoad.r,
+      lastMoveC: car.targetRoad.c,
+      offRoadSince: 0,
+      turnPauseUntil: 0,
+      turnPauseR: car.targetRoad.r,
+      turnPauseC: car.targetRoad.c
+    };
+    npc.sideTarget = npc.side;
+    npc.sideVisual = npc.side;
+
+    this.setStreetNpcScreenPosition(npc, npc.r, npc.c);
+    this.streetNpcs.push(npc);
+
+    this.tweens.add({
+      targets: sprite,
+      alpha: 1,
+      duration: 220,
+      ease: "Quad.Out"
+    });
+  }
+
+  getRoadSpawnCellNearBuilding(b) {
+    if (!b?.cells?.length) return null;
+    const center = this.getBuildingGridCenter(b) || b.cells[0];
+    const centerR = Math.round(center.r);
+    const centerC = Math.round(center.c);
+    const priorityDirs = this.getHouseSpawnDirectionPriority(b.typeKey, b.rotationStep || 0);
+
+    // 1) prioridad absoluta: lado segun rotacion del PNG
+    for (const d of priorityDirs) {
+      const rr = centerR + d.dr;
+      const cc = centerC + d.dc;
+      if (inBounds(rr, cc) && this.isRoadCell(rr, cc)) return { r: rr, c: cc };
+    }
+
+    // 2) fallback: cualquier borde de la casa que toque pista, minimizando distancia al centro
+    const dirs = [
+      { dr: -1, dc: 0 },
+      { dr: 1, dc: 0 },
+      { dr: 0, dc: -1 },
+      { dr: 0, dc: 1 }
+    ];
+    let best = null;
+    let bestD2 = Infinity;
+    for (const cell of b.cells) {
+      for (const d of dirs) {
+        const rr = cell.r + d.dr;
+        const cc = cell.c + d.dc;
+        if (!inBounds(rr, cc) || !this.isRoadCell(rr, cc)) continue;
+        const dr = rr - center.r;
+        const dc = cc - center.c;
+        const d2 = (dr * dr) + (dc * dc);
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = { r: rr, c: cc };
+        }
+      }
+    }
+
+    if (best) return best;
+    return this.getNearestRoadCellToPoint(center.r, center.c);
+  }
+
+  spawnStreetNpcFromHouse(b, now = Date.now()) {
+    if (!b || b.typeKey !== "green_1" || !b.isBuilt) return false;
+    if (this.streetNpcs.length >= TRAFFIC_MAX_NPCS) return false;
+    if (b.residentNpcSpawned) return false;
+
+    const targetRoad = this.getRoadSpawnCellNearBuilding(b);
+    if (!targetRoad) return false;
+
+    const baseColor = Phaser.Utils.Array.GetRandom(TRAFFIC_NPC_BASE_COLORS) || 0xf8fafc;
+    const sprite = this.add.circle(0, 0, 5, baseColor, 1)
+      .setStrokeStyle(2, 0x0f172a, 0.95)
+      .setAlpha(0)
+      .setDepth(69);
+    this.uiCam.ignore(sprite);
+
+    const center = this.getBuildingGridCenter(b) || b.cells?.[0] || targetRoad;
+    const face = this.getHouseSpawnFacing(b.typeKey, b.rotationStep || 0);
+    let faceR = face.dr;
+    let faceC = face.dc;
+    if (!faceR && !faceC) {
+      faceR = Math.sign(targetRoad.r - center.r);
+      faceC = Math.sign(targetRoad.c - center.c);
+      if (!faceR && !faceC) {
+        faceR = 0;
+        faceC = 1;
+      }
+    }
+
+    const roadP = isoToScreen(targetRoad.r, targetRoad.c);
+    const houseP = isoToScreen(center.r, center.c);
+    const introLerp = 0.36;
+    const introX = Math.round(Phaser.Math.Linear(roadP.x, houseP.x, introLerp));
+    const introY = Math.round(Phaser.Math.Linear(roadP.y + (TILE_H * 0.20), houseP.y + (TILE_H * 0.18), introLerp));
+    const introDuration = 520;
+
+    const npc = {
+      id: this.nextStreetNpcId++,
+      sprite,
+      baseColor,
+      isBackFacing: false,
+      r: targetRoad.r,
+      c: targetRoad.c,
+      path: null,
+      pathIndex: 0,
+      progress: 0,
+      speed: TRAFFIC_NPC_SPEED_TILES,
+      dirR: faceR,
+      dirC: faceC,
+      dirVisualR: faceR,
+      dirVisualC: faceC,
+      side: Math.random() < 0.5 ? -1 : 1,
+      sideTarget: 0,
+      sideVisual: 0,
+      waitUntil: 0,
+      nextPathAt: now + introDuration + Phaser.Math.Between(320, 900),
+      homeBuildingId: b.id,
+      sideSwitchStartAt: 0,
+      lastMoveAt: now,
+      lastMoveR: targetRoad.r,
+      lastMoveC: targetRoad.c,
+      offRoadSince: 0,
+      turnPauseUntil: 0,
+      turnPauseR: targetRoad.r,
+      turnPauseC: targetRoad.c,
+      introUntil: now + introDuration,
+      introX,
+      introY,
+      screenX: introX,
+      screenY: introY
+    };
+    npc.sideTarget = npc.side;
+    npc.sideVisual = npc.side;
+
+    const facingScreenDy = (npc.dirVisualR + npc.dirVisualC) * (TILE_H * 0.5);
+    npc.isBackFacing = facingScreenDy < -0.01;
+    sprite.setFillStyle(npc.isBackFacing ? TRAFFIC_NPC_BACK_COLOR : baseColor, 1);
+    sprite.setPosition(introX, introY);
+    sprite.setDepth(30.18 + (introY * 0.01));
+
+    this.streetNpcs.push(npc);
+    b.residentNpcSpawned = true;
+
+    this.tweens.add({
+      targets: sprite,
+      alpha: 1,
+      duration: introDuration,
+      ease: "Quad.Out"
+    });
+    return true;
+  }
+
+  finishTrafficCar(index, car, now = Date.now()) {
+    const home = buildings.get(car.targetHouseId);
+    if (home && home.isBuilt) {
+      this.spawnStreetNpcFromCar(car);
+    }
+
+    const spr = car.sprite;
+    this.trafficCars.splice(index, 1);
+    this.tweens.add({
+      targets: spr,
+      alpha: 0,
+      duration: 260,
+      ease: "Quad.In",
+      onComplete: () => spr.destroy()
+    });
+  }
+
+  updateTrafficCars(now = Date.now(), deltaMs = 16) {
+    for (let i = this.trafficCars.length - 1; i >= 0; i--) {
+      const car = this.trafficCars[i];
+      if (!car?.sprite?.active) {
+        this.trafficCars.splice(i, 1);
+        continue;
+      }
+
+      const lastIndex = car.path.length - 1;
+      if (car.pathIndex >= lastIndex) {
+        if (now >= (car.holdUntil || 0)) {
+          this.finishTrafficCar(i, car, now);
+        } else {
+          this.setTrafficCarScreenPosition(car, car.r, car.c, car.dirR || 0, car.dirC || 0);
+        }
+        continue;
+      }
+
+      car.progress += (car.speed * deltaMs) / 1000;
+      while (car.progress >= 1 && car.pathIndex < lastIndex) {
+        car.progress -= 1;
+        car.pathIndex++;
+      }
+
+      if (car.pathIndex >= lastIndex) {
+        const end = car.path[lastIndex];
+        this.setTrafficCarScreenPosition(car, end.r, end.c, car.dirR || 0, car.dirC || 0);
+        if (now >= (car.holdUntil || 0)) {
+          this.finishTrafficCar(i, car, now);
+        }
+        continue;
+      }
+
+      const from = car.path[car.pathIndex];
+      const to = car.path[car.pathIndex + 1];
+      const dirR = to.r - from.r;
+      const dirC = to.c - from.c;
+      car.dirR = dirR;
+      car.dirC = dirC;
+      const r = from.r + (dirR * car.progress);
+      const c = from.c + (dirC * car.progress);
+      this.setTrafficCarScreenPosition(car, r, c, dirR, dirC);
+    }
+  }
+
+  updateStreetNpcs(now = Date.now(), deltaMs = 16) {
+    for (let i = this.streetNpcs.length - 1; i >= 0; i--) {
+      const npc = this.streetNpcs[i];
+      if (!npc?.sprite?.active) {
+        this.streetNpcs.splice(i, 1);
+        continue;
+      }
+
+      if ((npc.introUntil || 0) > now) {
+        if (Number.isFinite(npc.introX) && Number.isFinite(npc.introY)) {
+          npc.screenX = npc.introX;
+          npc.screenY = npc.introY;
+          npc.sprite.setPosition(Math.round(npc.introX), Math.round(npc.introY));
+          npc.sprite.setDepth(30.18 + (npc.introY * 0.01));
+        }
+        continue;
+      }
+      if (npc.introUntil) {
+        npc.introUntil = 0;
+        this.setStreetNpcScreenPosition(npc, npc.r, npc.c);
+        npc.lastMoveAt = now;
+        npc.lastMoveR = npc.r;
+        npc.lastMoveC = npc.c;
+      }
+
+      if (!Number.isFinite(npc.lastMoveAt)) npc.lastMoveAt = now;
+      if (!Number.isFinite(npc.lastMoveR)) npc.lastMoveR = npc.r;
+      if (!Number.isFinite(npc.lastMoveC)) npc.lastMoveC = npc.c;
+      if (!Number.isFinite(npc.sideSwitchStartAt)) npc.sideSwitchStartAt = 0;
+      if (!Number.isFinite(npc.turnPauseUntil)) npc.turnPauseUntil = 0;
+
+      const atR = Math.round(npc.r);
+      const atC = Math.round(npc.c);
+      if (!this.isRoadCell(atR, atC)) {
+        const cellB = this.getBuildingAtCell(atR, atC);
+        const blockedByBuilding = !!(cellB && !this.isRoadBuilding(cellB));
+        if (!blockedByBuilding && !npc.offRoadSince) npc.offRoadSince = now;
+        if (!blockedByBuilding && (now - npc.offRoadSince) < TRAFFIC_NPC_OFFROAD_GRACE_MS) {
+          this.setStreetNpcScreenPosition(npc, npc.r, npc.c);
+          continue;
+        }
+        const snap = this.getNearestRoadCellToPoint(atR, atC);
+        if (!snap) {
+          npc.sprite.destroy();
+          this.streetNpcs.splice(i, 1);
+          continue;
+        }
+        npc.path = null;
+        npc.pathIndex = 0;
+        npc.progress = 0;
+        npc.waitUntil = 0;
+        npc.sideSwitchStartAt = 0;
+        npc.turnPauseUntil = 0;
+        npc.turnPauseR = snap.r;
+        npc.turnPauseC = snap.c;
+        // Evita deslizamiento visual sobre la casa al reubicar.
+        npc.screenX = Number.NaN;
+        npc.screenY = Number.NaN;
+        this.setStreetNpcScreenPosition(npc, snap.r, snap.c);
+        npc.lastMoveAt = now;
+        npc.lastMoveR = snap.r;
+        npc.lastMoveC = snap.c;
+        npc.offRoadSince = 0;
+      } else {
+        npc.offRoadSince = 0;
+      }
+
+      const done = !npc.path || npc.pathIndex >= (npc.path.length - 1);
+      if (done) {
+        if (now >= (npc.nextPathAt || 0)) {
+          this.assignStreetNpcRoute(npc, now);
+        }
+        npc.sideSwitchStartAt = 0;
+        npc.turnPauseUntil = 0;
+        this.setStreetNpcScreenPosition(npc, npc.r, npc.c);
+        continue;
+      }
+
+      if (npc.side !== npc.sideTarget) {
+        if (!npc.sideSwitchStartAt) npc.sideSwitchStartAt = now;
+        if ((now - npc.sideSwitchStartAt) >= TRAFFIC_NPC_SIDE_SWITCH_TIMEOUT_MS) {
+          npc.sideTarget = npc.side;
+          npc.waitUntil = 0;
+          npc.sideSwitchStartAt = 0;
+        }
+
+        if (now < (npc.waitUntil || 0)) continue;
+
+        const curR = Math.round(npc.r);
+        const curC = Math.round(npc.c);
+        if (this.isSideBlockedForNpc(curR, curC, npc.dirR || 0, npc.dirC || 0, npc.sideTarget || 1)) {
+          const safeSide = this.getSafeRoadEdgeSideForNpc(
+            curR,
+            curC,
+            npc.dirR || 0,
+            npc.dirC || 0,
+            npc.side || 1
+          );
+
+          if (safeSide === npc.side
+            || this.isSideBlockedForNpc(curR, curC, npc.dirR || 0, npc.dirC || 0, safeSide)) {
+            npc.sideTarget = npc.side;
+            npc.waitUntil = 0;
+            npc.sideSwitchStartAt = 0;
+          } else {
+            npc.sideTarget = safeSide;
+            npc.waitUntil = now + Phaser.Math.Between(280, 600);
+          }
+
+          continue;
+        }
+
+        if (this.hasNearbyCarAt(npc.r, npc.c, TRAFFIC_CAR_NEAR_RADIUS_TILES)) {
+          npc.waitUntil = now + Phaser.Math.Between(TRAFFIC_NPC_CROSS_WAIT_MIN_MS, TRAFFIC_NPC_CROSS_WAIT_MAX_MS);
+          continue;
+        }
+
+        npc.side = npc.sideTarget;
+        npc.waitUntil = 0;
+        npc.sideSwitchStartAt = 0;
+      } else {
+        npc.sideSwitchStartAt = 0;
+      }
+
+      if ((npc.turnPauseUntil || 0) > now) {
+        // Quedarse totalmente quieto durante la pausa de giro.
+        continue;
+      }
+      npc.turnPauseUntil = 0;
+
+      const prevR = npc.r;
+      const prevC = npc.c;
+      npc.progress += (npc.speed * deltaMs) / 1000;
+      const lastIndex = npc.path.length - 1;
+      while (npc.progress >= 1 && npc.pathIndex < lastIndex) {
+        const segFrom = npc.path[npc.pathIndex];
+        const segTo = npc.path[npc.pathIndex + 1];
+        const inDirR = segTo.r - segFrom.r;
+        const inDirC = segTo.c - segFrom.c;
+        npc.progress -= 1;
+        npc.pathIndex++;
+
+        if (npc.pathIndex < lastIndex) {
+          const node = npc.path[npc.pathIndex];
+          const nextNode = npc.path[npc.pathIndex + 1];
+          const outDirR = nextNode.r - node.r;
+          const outDirC = nextNode.c - node.c;
+          const changedDir = (inDirR !== outDirR) || (inDirC !== outDirC);
+          if (changedDir) {
+            npc.r = node.r;
+            npc.c = node.c;
+            npc.dirR = outDirR;
+            npc.dirC = outDirC;
+            npc.sideTarget = npc.side;
+            npc.sideVisual = npc.side;
+            npc.progress = 0;
+            npc.turnPauseR = node.r;
+            npc.turnPauseC = node.c;
+            // Fijar posicion exacta del nodo antes de pausar.
+            npc.screenX = Number.NaN;
+            npc.screenY = Number.NaN;
+            this.setStreetNpcScreenPosition(npc, node.r, node.c);
+            npc.turnPauseUntil = now + Phaser.Math.Between(
+              TRAFFIC_NPC_TURN_PAUSE_MIN_MS,
+              TRAFFIC_NPC_TURN_PAUSE_MAX_MS
+            );
+            break;
+          }
+        }
+      }
+
+      if ((npc.turnPauseUntil || 0) > now) {
+        // Quedarse totalmente quieto durante la pausa de giro.
+        continue;
+      }
+
+      if (npc.pathIndex >= lastIndex) {
+        const end = npc.path[lastIndex];
+        npc.dirR = 0;
+        npc.dirC = 1;
+        this.setStreetNpcScreenPosition(npc, end.r, end.c);
+        const movedToEnd = Math.hypot(
+          end.r - (Number.isFinite(npc.lastMoveR) ? npc.lastMoveR : prevR),
+          end.c - (Number.isFinite(npc.lastMoveC) ? npc.lastMoveC : prevC)
+        );
+        if (movedToEnd > TRAFFIC_NPC_STUCK_EPS_TILES) {
+          npc.lastMoveAt = now;
+          npc.lastMoveR = end.r;
+          npc.lastMoveC = end.c;
+        }
+        npc.nextPathAt = now + Phaser.Math.Between(800, 1700);
+        continue;
+      }
+
+      const from = npc.path[npc.pathIndex];
+      const to = npc.path[npc.pathIndex + 1];
+      npc.dirR = to.r - from.r;
+      npc.dirC = to.c - from.c;
+      const r = from.r + (npc.dirR * npc.progress);
+      const c = from.c + (npc.dirC * npc.progress);
+      this.setStreetNpcScreenPosition(npc, r, c);
+
+      const moved = Math.hypot(
+        npc.r - (Number.isFinite(npc.lastMoveR) ? npc.lastMoveR : prevR),
+        npc.c - (Number.isFinite(npc.lastMoveC) ? npc.lastMoveC : prevC)
+      );
+      if (moved > TRAFFIC_NPC_STUCK_EPS_TILES) {
+        npc.lastMoveAt = now;
+        npc.lastMoveR = npc.r;
+        npc.lastMoveC = npc.c;
+      } else if ((now - npc.lastMoveAt) >= TRAFFIC_NPC_STUCK_REPATH_MS) {
+        npc.path = null;
+        npc.pathIndex = 0;
+        npc.progress = 0;
+        npc.waitUntil = 0;
+        npc.sideTarget = npc.side || 1;
+        npc.sideSwitchStartAt = 0;
+        npc.nextPathAt = now + Phaser.Math.Between(120, 320);
+        this.assignStreetNpcRoute(npc, now);
+        this.setStreetNpcScreenPosition(npc, npc.r, npc.c);
+        npc.lastMoveAt = now;
+        npc.lastMoveR = npc.r;
+        npc.lastMoveC = npc.c;
+      }
+    }
+  }
+
+  updateTrafficSystem(deltaMs = 16) {
+    const now = Date.now();
+    if (TRAFFIC_ENABLE_CARS) {
+      this.updateTrafficCars(now, deltaMs);
+    } else if (this.trafficCars.length) {
+      for (const car of this.trafficCars) {
+        if (car?.sprite?.active) car.sprite.destroy();
+      }
+      this.trafficCars.length = 0;
+    }
+    this.updateStreetNpcs(now, deltaMs);
+  }
+
+  toGridCodeColumn(index) {
+    let n = Math.max(0, Math.floor(index)) + 1;
+    let out = "";
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      out = String.fromCharCode(65 + rem) + out;
+      n = Math.floor((n - 1) / 26);
+    }
+    return out || "A";
+  }
+
+  toGridCodeLabel(r, c) {
+    return `${this.toGridCodeColumn(c)}${Math.max(1, Math.floor(r) + 1)}`;
+  }
+
+  getGridCodeText(index) {
+    if (!Array.isArray(this.gridCodeTextPool)) this.gridCodeTextPool = [];
+    if (this.gridCodeTextPool[index]) return this.gridCodeTextPool[index];
+
+    const txt = this.add.text(0, 0, "", {
+      fontFamily: "Arial",
+      fontSize: "11px",
+      color: "#0f172a",
+      stroke: "#e2e8f0",
+      strokeThickness: 2
+    })
+      .setOrigin(0.5, 0.5)
+      .setDepth(33)
+      .setVisible(false);
+
+    this.gridCodeLayer?.add(txt);
+    this.gridCodeTextPool[index] = txt;
+    return txt;
+  }
+
+  clearGridCodeOverlay() {
+    if (!Array.isArray(this.gridCodeTextPool)) return;
+    for (const txt of this.gridCodeTextPool) {
+      if (txt?.active) txt.setVisible(false);
+    }
+  }
+
+  drawGridCodeOverlay(force = false) {
+    if (!this.gridCodeDebugEnabled) {
+      this.clearGridCodeOverlay();
+      return;
+    }
+
+    const cam = this.worldCam;
+    if (!cam) return;
+    cam.preRender();
+    const view = cam.worldView;
+    const xMin = view.x - TILE_W;
+    const xMax = view.x + view.width + TILE_W;
+    const yMin = view.y - TILE_H;
+    const yMax = view.y + view.height + TILE_H;
+
+    const dMin = xMin / (TILE_W / 2);
+    const dMax = xMax / (TILE_W / 2);
+    const sMin = yMin / (TILE_H / 2);
+    const sMax = yMax / (TILE_H / 2);
+
+    const rowMin = ((sMin - dMax) / 2) + MAP_CENTER_R;
+    const rowMax = ((sMax - dMin) / 2) + MAP_CENTER_R;
+    const colMin = ((sMin + dMin) / 2) + MAP_CENTER_C;
+    const colMax = ((sMax + dMax) / 2) + MAP_CENTER_C;
+
+    const buffer = 1;
+    const rStart = Math.max(0, Math.floor(rowMin) - buffer);
+    const rEnd = Math.min(MAP_H - 1, Math.ceil(rowMax) + buffer);
+    const cStart = Math.max(0, Math.floor(colMin) - buffer);
+    const cEnd = Math.min(MAP_W - 1, Math.ceil(colMax) + buffer);
+
+    const totalTiles = Math.max(1, (rEnd - rStart + 1) * (cEnd - cStart + 1));
+    let step = 1;
+    if (totalTiles > 2800) step = 2;
+    if (totalTiles > 6200) step = 3;
+    if (totalTiles > 10800) step = 4;
+    if (cam.zoom < 1.4) step = Math.max(step, 3);
+    if (cam.zoom < 1.0) step = Math.max(step, 4);
+
+    const rOffset = ((step - (rStart % step)) % step);
+    const cOffset = ((step - (cStart % step)) % step);
+    let idx = 0;
+
+    for (let r = rStart + rOffset; r <= rEnd; r += step) {
+      for (let c = cStart + cOffset; c <= cEnd; c += step) {
+        const p = isoToScreen(r, c);
+        const txt = this.getGridCodeText(idx++);
+        txt.setText(this.toGridCodeLabel(r, c));
+        txt.setPosition(p.x, p.y + 1);
+        txt.setVisible(true);
+      }
+    }
+
+    for (let i = idx; i < this.gridCodeTextPool.length; i++) {
+      const txt = this.gridCodeTextPool[i];
+      if (txt?.active) txt.setVisible(false);
+    }
+
+    if (force) {
+      // Fuerza refresh visual al alternar ON sin mover camara.
+      this.gridCodeLayer?.setDepth(33);
+    }
+  }
+
+  getAdminForcedRoadPiece() {
+    const v = Number(this.adminForcedRoadPiece) || 0;
+    return Phaser.Math.Clamp(Math.round(v), 0, ROADKOTO_PIECES);
+  }
+
+  clearAdminRoadPiecePlacement() {
+    this.adminForcedRoadPiece = 0;
+  }
+
+  setAdminRoadPiecePlacement(piece = 0) {
+    const clamped = Phaser.Math.Clamp(Math.round(Number(piece) || 0), 0, ROADKOTO_PIECES);
+    this.adminForcedRoadPiece = clamped;
+    this.selectedBuildKey = "road_main_2x2";
+    this.buildRotationStep = 0;
+    this.buildPreviewTypeKey = "road_main_2x2";
+    if (this.pending) this.clearPending();
+    this.setBuildMode();
+    return clamped;
+  }
+
+  getRoadPieceSelectionForBuilding(b) {
+    if (!b || b.typeKey !== "road_main_2x2") return { piece: 0, rot: 0, forced: false };
+
+    const forcedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadForcedPiece) || 0), 0, ROADKOTO_PIECES);
+    if (forcedPiece > 0) {
+      return { piece: forcedPiece, rot: 0, forced: true };
+    }
+
+    const topLeft = this.getRoadTopLeftCell(b);
+    if (!topLeft) return { piece: 0, rot: 0, forced: false };
+
+    const mask = this.getRoadNeighborMaskForBlock(topLeft.r, topLeft.c);
+    const diagMask = this.getRoadDiagonalMaskForBlock(topLeft.r, topLeft.c);
+    const pieceSel = this.getRoadKotoPieceForMask(mask, diagMask, topLeft.r, topLeft.c) || { piece: 0, rot: 0 };
+    const piece = Phaser.Math.Clamp(Math.round(Number(pieceSel?.piece) || 0), 0, ROADKOTO_PIECES);
+    const rotRaw = Math.round(Number(pieceSel?.rot) || 0);
+    const rot = ((rotRaw % 360) + 360) % 360;
+    return { piece, rot, forced: false };
+  }
+
+  toRoadPieceAdminCode(piece = 0) {
+    const n = Phaser.Math.Clamp(Math.round(Number(piece) || 0), 0, ROADKOTO_PIECES);
+    if (n <= 0) return "R--";
+    return `R${String(n).padStart(2, "0")}`;
+  }
+
+  getRoadPieceNumberForBuilding(b) {
+    if (!b || b.typeKey !== "road_main_2x2") return 0;
+    const current = this.getRoadCurrentPieceNumber(b);
+    if (current > 0) return current;
+    return this.getRoadPieceSelectionForBuilding(b).piece;
+  }
+
+  getRoadPieceDebugText(index) {
+    if (!Array.isArray(this.roadPieceDebugTextPool)) this.roadPieceDebugTextPool = [];
+    if (this.roadPieceDebugTextPool[index]) return this.roadPieceDebugTextPool[index];
+
+    const txt = this.add.text(0, 0, "", {
+      fontFamily: "Arial",
+      fontSize: "12px",
+      fontStyle: "bold",
+      color: "#fecaca",
+      stroke: "#111827",
+      strokeThickness: 3
+    })
+      .setOrigin(0.5, 0.5)
+      .setDepth(37)
+      .setVisible(false);
+
+    this.roadPieceDebugLayer?.add(txt);
+    this.roadPieceDebugTextPool[index] = txt;
+    return txt;
+  }
+
+  clearRoadPieceDebugOverlay() {
+    if (!Array.isArray(this.roadPieceDebugTextPool)) return;
+    for (const txt of this.roadPieceDebugTextPool) {
+      if (txt?.active) txt.setVisible(false);
+    }
+  }
+
+  drawRoadPieceDebugOverlay(force = false) {
+    if (!this.roadPieceDebugEnabled) {
+      this.clearRoadPieceDebugOverlay();
+      return;
+    }
+
+    const roads = [];
+    for (const b of buildings.values()) {
+      if (!b || b.typeKey !== "road_main_2x2" || !Array.isArray(b.cells) || !b.cells.length) continue;
+      roads.push(b);
+    }
+    roads.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+
+    let idx = 0;
+    for (const road of roads) {
+      const topLeft = this.getRoadTopLeftCell(road);
+      if (!topLeft) continue;
+      const pieceNum = this.getRoadPieceNumberForBuilding(road);
+      if (pieceNum <= 0) continue;
+      const center = isoToScreen(topLeft.r + 0.5, topLeft.c + 0.5);
+      const txt = this.getRoadPieceDebugText(idx++);
+      const mask = this.getRoadNeighborMaskForBlock(topLeft.r, topLeft.c);
+      const diagMask = this.getRoadDiagonalMaskForBlock(topLeft.r, topLeft.c);
+      const baseCode = this.toRoadPieceAdminCode(pieceNum);
+      const nCode = (mask & 1) ? 1 : 0;
+      const eCode = (mask & 2) ? 1 : 0;
+      const sCode = (mask & 4) ? 1 : 0;
+      const oCode = (mask & 8) ? 1 : 0;
+      const noCode = (diagMask & 1) ? 1 : 0;
+      const neCode = (diagMask & 2) ? 1 : 0;
+      const seCode = (diagMask & 4) ? 1 : 0;
+      const soCode = (diagMask & 8) ? 1 : 0;
+      txt.setText(`${baseCode}\nN${nCode} E${eCode} S${sCode} O${oCode} | NO${noCode} NE${neCode} SE${seCode} SO${soCode}`);
+      txt.setPosition(center.x, center.y - (TILE_H * 0.2));
+      txt.setVisible(true);
+    }
+
+    for (let i = idx; i < this.roadPieceDebugTextPool.length; i++) {
+      const txt = this.roadPieceDebugTextPool[i];
+      if (txt?.active) txt.setVisible(false);
+    }
+
+    if (force) this.roadPieceDebugLayer?.setDepth(37);
+  }
+
+  shouldShowItemDirectionBySize(size) {
+    return size === 1 || size === 2 || size === 3 || size === 4 || size === 9;
+  }
+
+  getItemDirectionCodePrefix(size) {
+    if (size === 1) return "A";
+    if (size === 2) return "B";
+    if (size === 3) return "C";
+    if (size === 4) return "D";
+    if (size === 9) return "E";
+    return "X";
+  }
+
+  getItemDirectionDebugText(index) {
+    if (!Array.isArray(this.itemDirDebugTextPool)) this.itemDirDebugTextPool = [];
+    if (this.itemDirDebugTextPool[index]) return this.itemDirDebugTextPool[index];
+
+    const txt = this.add.text(0, 0, "", {
+      fontFamily: "Arial",
+      fontSize: "13px",
+      fontStyle: "bold",
+      color: "#f8fafc",
+      stroke: "#020617",
+      strokeThickness: 3
+    })
+      .setOrigin(0.5, 0.5)
+      .setDepth(36)
+      .setVisible(false);
+
+    this.itemDirDebugLayer?.add(txt);
+    this.itemDirDebugTextPool[index] = txt;
+    return txt;
+  }
+
+  clearItemDirectionOverlay() {
+    this.itemDirDebugGfx?.clear();
+    if (!Array.isArray(this.itemDirDebugTextPool)) return;
+    for (const txt of this.itemDirDebugTextPool) {
+      if (txt?.active) txt.setVisible(false);
+    }
+  }
+
+  drawItemDirectionOverlay(force = false) {
+    const g = this.itemDirDebugGfx;
+    if (!g) return;
+    g.clear();
+    if (!this.itemDirDebugEnabled) {
+      this.clearItemDirectionOverlay();
+      return;
+    }
+
+    const counters = new Map();
+    const entries = [];
+    for (const b of buildings.values()) {
+      if (!b?.cells?.length) continue;
+      const size = Number(b.size) || Number(BUILDING_TYPES[b.typeKey]?.size) || 1;
+      if (!this.shouldShowItemDirectionBySize(size)) continue;
+      const center = this.getBuildingGridCenter(b) || b.cells[0];
+      if (!center) continue;
+
+      const isRoad = b.typeKey === "road_main_2x2";
+      let codeLabel = "";
+      if (isRoad) {
+        const roadNum = this.getRoadPieceNumberForBuilding(b);
+        codeLabel = `ROAD ${String(Math.max(0, roadNum)).padStart(2, "0")}`;
+      } else {
+        const prefix = this.getItemDirectionCodePrefix(size);
+        const nextNum = (counters.get(prefix) || 0) + 1;
+        counters.set(prefix, nextNum);
+        codeLabel = `${prefix}${nextNum}`;
+      }
+      entries.push({
+        b,
+        size,
+        center,
+        isRoad,
+        code: codeLabel
+      });
+    }
+
+    entries.sort((a, b) => (Number(a.b?.id) || 0) - (Number(b.b?.id) || 0));
+
+    let textIdx = 0;
+    for (const e of entries) {
+      const center = isoToScreen(e.center.r, e.center.c);
+      const reachTiles = Math.max(1.05, (e.size * 0.58) + 0.25);
+      const pN = isoToScreen(e.center.r - reachTiles, e.center.c);
+      const pE = isoToScreen(e.center.r, e.center.c + reachTiles);
+      const pS = isoToScreen(e.center.r + reachTiles, e.center.c);
+      const pO = isoToScreen(e.center.r, e.center.c - reachTiles);
+      const diagScale = 0.82;
+      const pNO = {
+        x: center.x + (((pN.x - center.x) + (pO.x - center.x)) * diagScale),
+        y: center.y + (((pN.y - center.y) + (pO.y - center.y)) * diagScale)
+      };
+      const pNE = {
+        x: center.x + (((pN.x - center.x) + (pE.x - center.x)) * diagScale),
+        y: center.y + (((pN.y - center.y) + (pE.y - center.y)) * diagScale)
+      };
+      const pSE = {
+        x: center.x + (((pS.x - center.x) + (pE.x - center.x)) * diagScale),
+        y: center.y + (((pS.y - center.y) + (pE.y - center.y)) * diagScale)
+      };
+      const pSO = {
+        x: center.x + (((pS.x - center.x) + (pO.x - center.x)) * diagScale),
+        y: center.y + (((pS.y - center.y) + (pO.y - center.y)) * diagScale)
+      };
+
+      g.lineStyle(1, 0x0f172a, 0.6);
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pN.x, pN.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pE.x, pE.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pS.x, pS.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pO.x, pO.y); g.strokePath();
+      g.lineStyle(1, 0x334155, 0.45);
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pNO.x, pNO.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pNE.x, pNE.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pSE.x, pSE.y); g.strokePath();
+      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pSO.x, pSO.y); g.strokePath();
+
+      g.fillStyle(0x020617, 0.9);
+      g.fillCircle(center.x, center.y, 4);
+      g.lineStyle(1.4, 0xf8fafc, 0.92);
+      g.strokeCircle(center.x, center.y, 4);
+
+      const code = this.getItemDirectionDebugText(textIdx++);
+      code.setText(e.isRoad ? e.code : `${e.code} ${e.size}x${e.size}`);
+      code.setColor("#fde68a");
+      code.setPosition(center.x, center.y - (TILE_H * (0.58 + (e.size * 0.08))));
+      code.setVisible(true);
+
+      const n = this.getItemDirectionDebugText(textIdx++);
+      n.setText("N");
+      n.setColor("#93c5fd");
+      n.setPosition(pN.x, pN.y - 2);
+      n.setVisible(true);
+
+      const eTxt = this.getItemDirectionDebugText(textIdx++);
+      eTxt.setText("E");
+      eTxt.setColor("#86efac");
+      eTxt.setPosition(pE.x + 2, pE.y);
+      eTxt.setVisible(true);
+
+      const s = this.getItemDirectionDebugText(textIdx++);
+      s.setText("S");
+      s.setColor("#fef08a");
+      s.setPosition(pS.x, pS.y + 2);
+      s.setVisible(true);
+
+      const o = this.getItemDirectionDebugText(textIdx++);
+      o.setText("O");
+      o.setColor("#fca5a5");
+      o.setPosition(pO.x - 2, pO.y);
+      o.setVisible(true);
+      const noTxt = this.getItemDirectionDebugText(textIdx++);
+      noTxt.setText("NO");
+      noTxt.setColor("#bfdbfe");
+      noTxt.setPosition(pNO.x - 2, pNO.y - 2);
+      noTxt.setVisible(true);
+
+      const neTxt = this.getItemDirectionDebugText(textIdx++);
+      neTxt.setText("NE");
+      neTxt.setColor("#a7f3d0");
+      neTxt.setPosition(pNE.x + 2, pNE.y - 2);
+      neTxt.setVisible(true);
+
+      const seTxt = this.getItemDirectionDebugText(textIdx++);
+      seTxt.setText("SE");
+      seTxt.setColor("#fde68a");
+      seTxt.setPosition(pSE.x + 2, pSE.y + 2);
+      seTxt.setVisible(true);
+
+      const soTxt = this.getItemDirectionDebugText(textIdx++);
+      soTxt.setText("SO");
+      soTxt.setColor("#fecaca");
+      soTxt.setPosition(pSO.x - 2, pSO.y + 2);
+      soTxt.setVisible(true);
+    }
+
+    for (let i = textIdx; i < this.itemDirDebugTextPool.length; i++) {
+      const txt = this.itemDirDebugTextPool[i];
+      if (txt?.active) txt.setVisible(false);
+    }
+
+    if (force) {
+      this.itemDirDebugLayer?.setDepth(36);
+      this.itemDirDebugGfx?.setDepth(35);
+    }
+  }
+
+  drawNpcDebugOverlay() {
+    const g = this.npcDebugGfx;
+    if (!g) return;
+    g.clear();
+    if (!this.npcDebugEnabled) return;
+
+    for (const npc of this.streetNpcs) {
+      if (!npc?.sprite?.active) continue;
+      const color = (npc.id % 2 === 0) ? 0x38bdf8 : 0xf59e0b;
+      const path = Array.isArray(npc.path) ? npc.path : null;
+      const idx = Math.max(0, npc.pathIndex || 0);
+      const pCur = isoToScreen(npc.r, npc.c);
+
+      g.fillStyle(0x0f172a, 0.85);
+      g.fillCircle(pCur.x, pCur.y + 6, 4);
+      g.lineStyle(2, color, 0.9);
+
+      if (path && path.length > 1) {
+        g.beginPath();
+        g.moveTo(pCur.x, pCur.y + 6);
+        for (let i = idx + 1; i < path.length; i++) {
+          const p = isoToScreen(path[i].r, path[i].c);
+          g.lineTo(p.x, p.y + 6);
+        }
+        g.strokePath();
+
+        for (let i = idx; i < path.length; i++) {
+          const p = isoToScreen(path[i].r, path[i].c);
+          g.fillStyle(i === idx ? 0x22c55e : 0xe2e8f0, i === idx ? 0.95 : 0.75);
+          g.fillCircle(p.x, p.y + 6, i === idx ? 3.5 : 2.5);
+        }
+      }
+
+      if ((npc.turnPauseUntil || 0) > Date.now()) {
+        const holdR = Number.isFinite(npc.turnPauseR) ? npc.turnPauseR : npc.r;
+        const holdC = Number.isFinite(npc.turnPauseC) ? npc.turnPauseC : npc.c;
+        const pHold = isoToScreen(holdR, holdC);
+        g.lineStyle(2, 0xef4444, 0.95);
+        g.strokeCircle(pHold.x, pHold.y + 6, 8);
+      }
+    }
+  }
+
+  trySpawnDeliveryCarToDecorHouse(b, now = Date.now()) {
+    if (!TRAFFIC_ENABLE_CARS) return;
+    if (!b || b.typeKey !== "green_1" || !b.isBuilt) return;
+    if (this.trafficCars.length >= TRAFFIC_MAX_CARS) return;
+
+    const center = this.getBuildingGridCenter(b) || b.cells?.[0];
+    if (!center) return;
+
+    const targetRoad = this.getNearestRoadCellToPoint(center.r, center.c);
+    if (!targetRoad) return;
+
+    let path = null;
+    for (let i = 0; i < 10; i++) {
+      const startRoad = this.pickRandomRoadCell(targetRoad, 8);
+      if (!startRoad) break;
+      const candidate = this.findRoadPath(startRoad, targetRoad, 4500);
+      if (candidate && candidate.length >= 2) {
+        path = candidate;
+        break;
+      }
+    }
+    if (!path) path = [{ r: targetRoad.r, c: targetRoad.c }];
+
+    const sprite = this.add.rectangle(0, 0, 24, 11, 0x374151, 1)
+      .setStrokeStyle(2, 0xe5e7eb, 0.95)
+      .setAlpha(0)
+      .setDepth(68);
+    this.uiCam.ignore(sprite);
+
+    const start = path[0];
+    const next = path[1] || start;
+    const car = {
+      id: this.nextTrafficCarId++,
+      sprite,
+      path,
+      pathIndex: 0,
+      progress: 0,
+      speed: TRAFFIC_CAR_SPEED_TILES,
+      dirR: next.r - start.r,
+      dirC: next.c - start.c,
+      r: start.r,
+      c: start.c,
+      holdUntil: now + (path.length <= 1 ? 420 : 0),
+      targetHouseId: b.id,
+      targetRoad
+    };
+
+    this.trafficCars.push(car);
+    this.setTrafficCarScreenPosition(car, start.r, start.c, car.dirR, car.dirC);
+
+    this.tweens.add({
+      targets: sprite,
+      alpha: 1,
+      duration: 260,
+      ease: "Quad.Out"
+    });
+  }
+
+  isBuildingInfoLocked(b, now = Date.now()) {
+    if (!b) return true;
+    if (!b.isBuilt) return true;
+    return !!(b.constructAnimUntil && now < b.constructAnimUntil);
+  }
+
+  playBuildingConstructDropAnimation(b, now = Date.now()) {
+    if (!b || b.typeKey === "road_main_2x2") return;
+    if ((b.buildSeconds ?? 0) <= 0) return;
+    if ((b.constructAnimUntil || 0) > now) return;
+
+    const target = (b.sprite && b.sprite.visible) ? b.sprite : b.gfx;
+    if (!target || !target.active) return;
+
+    const duration = 480;
+    const dropPx = Math.max(16, Math.round(TILE_H * 2.2));
+    const finalY = Number(target.y) || 0;
+
+    b.constructAnimActive = true;
+    b.constructAnimUntil = now + duration;
+
+    target.y = finalY - dropPx;
+    target.alpha = Math.min(1, Math.max(0.45, Number(target.alpha) || 1));
+
+    this.tweens.add({
+      targets: target,
+      y: finalY,
+      alpha: 1,
+      duration,
+      ease: "Bounce.Out",
+      onComplete: () => {
+        if (!buildings.has(b.id)) return;
+        target.y = finalY;
+        target.alpha = 1;
+        b.constructAnimActive = false;
+        b.constructAnimUntil = 0;
+        if (b.typeKey === "green_1") {
+          this.spawnStreetNpcFromHouse(b, Date.now());
+        }
+        this.updateBuildingInfoModal(b, BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1, Date.now());
+      }
+    });
+  }
+
+  onBuildingConstructed(b, now = Date.now()) {
+    if (!b) return;
+    const waitForDropAnim = (b.typeKey === "green_1") && ((b.buildSeconds ?? 0) > 0);
+    this.playBuildingConstructDropAnimation(b, now);
+    if (b.typeKey === "green_1" && !waitForDropAnim) {
+      this.spawnStreetNpcFromHouse(b, now);
+    }
   }
 
   isSpriteBuilding(typeKey) {
@@ -972,11 +3200,75 @@ class MainScene extends Phaser.Scene {
     this.clearBuffAreaGhost();
     this.ghostSprite?.setVisible(false);
     this.moveGhostSprite?.setVisible(false);
-
+    this.buildRotationStep = 0;
+    this.buildPreviewTypeKey = this.selectedBuildKey || "green_1";
     this.cancelBuildBtn.setVisible(false);
     this.cancelBuildBorder.setVisible(false);
   }
 
+  setupBuildHotkeys() {
+    if (this._buildHotkeysBound) return;
+    this._buildHotkeysBound = true;
+    this.input.keyboard?.on("keydown-ESC", () => {
+      if (mode !== "build") return;
+      this.setCursorMode();
+    });
+  }
+
+  rotateBuildPreview() {
+    if (mode !== "build") return;
+    const preview = this.getBuildPreview();
+    if (!this.canRotateBuilding(preview.typeKey)) return;
+
+    this.buildRotationStep = ((preview.rotationStep || 0) + 1) % 4;
+
+    if (this.pending) {
+      this.pending.rotationStep = this.buildRotationStep;
+      this.pending.ok = this.canPlaceBuildAt(
+        this.pending.typeKey || this.getBuildPreview().typeKey,
+        this.pending.size,
+        this.pending.tile.r,
+        this.pending.tile.c
+      );
+      this.renderPendingGhost();
+      this.showConfirmButtons(this.pending.ok);
+      return;
+    }
+
+    const pointer = this.input?.activePointer;
+    if (!pointer || pointer.y <= 140) return;
+    const tile = screenToIsoTile(pointer.worldX, pointer.worldY);
+    if (!tile) {
+      this.ghost.clear();
+      this.clearBuffAreaGhost();
+      this.ghostSprite?.setVisible(false);
+      return;
+    }
+
+    const refreshed = this.getBuildPreview();
+    const size = refreshed.size;
+    const ok = this.canPlaceBuildAt(refreshed.typeKey, size, tile.r, tile.c);
+    const okColor = refreshed.def.fill ?? 0x22c55e;
+    const okBorder = refreshed.def.border ?? okColor;
+    const badColor = 0xf87171;
+
+    const cells = [];
+    for (let r = tile.r; r < tile.r + size; r++) {
+      for (let c = tile.c; c < tile.c + size; c++) {
+        if (inBounds(r, c)) cells.push({ r, c });
+      }
+    }
+
+    this.ghost.clear();
+    this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.25, ok ? okBorder : badColor);
+    this.drawBuffAreaGhostForPlacement(refreshed.typeKey, tile.r, tile.c, size, 0);
+
+    if (this.isSpriteBuilding(refreshed.typeKey) && size === 1) {
+      this.placeSpriteAtTile(this.ghostSprite, refreshed.typeKey, refreshed.rotationStep || 0, tile.r, tile.c, ok ? 0.55 : 0.42);
+    } else {
+      this.ghostSprite?.setVisible(false);
+    }
+  }
   uiGuard(pointer) {
     this.uiClick = true;
     if (pointer?.event) {
@@ -1213,7 +3505,7 @@ class MainScene extends Phaser.Scene {
 
   renderPendingGhost() {
     if (!this.pending) return;
-    const { tile, size, ok, color, border } = this.pending;
+    const { tile, size, ok, color, border, rotationStep } = this.pending;
     const preview = this.getBuildPreview();
 
     this.ghost.clear();
@@ -1230,7 +3522,7 @@ class MainScene extends Phaser.Scene {
     this.drawCells(this.ghost, cells, ok ? okColor : badColor, 0.35, ok ? okBorder : badColor);
     this.drawBuffAreaGhostForPlacement(preview.typeKey, tile.r, tile.c, size, 0);
     if (this.isSpriteBuilding(preview.typeKey) && size === 1) {
-      this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, 0, tile.r, tile.c, ok ? 0.55 : 0.42);
+      this.placeSpriteAtTile(this.ghostSprite, preview.typeKey, preview.rotationStep || 0, tile.r, tile.c, ok ? 0.55 : 0.42);
     } else {
       this.ghostSprite?.setVisible(false);
     }
@@ -1279,7 +3571,8 @@ class MainScene extends Phaser.Scene {
   }
 
   showActionButtons() {
-    this.actRotate.setVisible(true);
+    const b = this.selectedBuildingId ? buildings.get(this.selectedBuildingId) : null;
+    this.actRotate.setVisible(!!(b && this.canRotateBuilding(b.typeKey)));
     this.actMove.setVisible(true);
     this.actTrash.setVisible(true);
   }
@@ -1313,7 +3606,16 @@ class MainScene extends Phaser.Scene {
     this.clearPending();
     this.ghost.clear();
 
+    const selected = buildings.get(idOnTile);
+    if (this.isBuildingInfoLocked(selected, Date.now())) {
+      this.selectedBuildingId = null;
+      return;
+    }
     this.selectedBuildingId = idOnTile;
+    if (selected?.typeKey === "road_main_2x2") {
+      this.normalizeRoadBuildingState(selected, true);
+      this.refreshRoadVisualsAroundCells(selected.cells, 1);
+    }
 
     this.actionClickX = pointer.x;
     this.actionClickY = pointer.y;
@@ -1338,6 +3640,7 @@ class MainScene extends Phaser.Scene {
 
   getRarityForKey(typeKey) {
     if (typeKey === "green_1") return 1;
+    if (typeKey === "road_main_2x2") return 1;
     if (typeKey === "green_2") return 2;
     if (typeKey === "green_3") return 3;
     if (typeKey === "green_4") return 4;
@@ -1360,11 +3663,24 @@ class MainScene extends Phaser.Scene {
     if (typeKey.startsWith("red_") || typeKey === "perm_red_9") return "red";
     if (typeKey.startsWith("blue_") || typeKey === "perm_blue_9") return "blue";
     if (typeKey === "lim_gold_2") return "gold";
+    if (typeKey === "road_main_2x2") return "road";
     return null;
   }
 
   isDecorativeHouse(typeKey) {
     return typeKey === "green_1";
+  }
+
+  isRotationDisabledBuilding(typeKey) {
+    return typeKey === "road_main_2x2";
+  }
+
+  canRotateBuilding(typeKey) {
+    return !this.isRotationDisabledBuilding(typeKey);
+  }
+
+  isEvolutionDisabledBuilding(typeKey) {
+    return typeKey === "road_main_2x2";
   }
 
   getDecorAuraFromLevel(level) {
@@ -1409,6 +3725,7 @@ class MainScene extends Phaser.Scene {
 
   isYapaBonusEligibleBuilding(b, def = null) {
     if (!b || !b.isBuilt) return false;
+    if (this.isEvolutionDisabledBuilding(b.typeKey)) return false;
     const rarity = this.getRarityForKey(b.typeKey);
     return rarity >= 1 && rarity <= 3;
   }
@@ -1513,9 +3830,7 @@ class MainScene extends Phaser.Scene {
 
     const candidates = [];
     for (const b of buildings.values()) {
-      if (!b?.isBuilt) continue;
-      const rarity = this.getRarityForKey(b.typeKey);
-      if (rarity < 1 || rarity > 3) continue;
+      if (!this.isYapaBonusEligibleBuilding(b)) continue;
       candidates.push(b);
     }
 
@@ -1667,6 +3982,15 @@ class MainScene extends Phaser.Scene {
   getEvolutionStats(typeKey, stage, level) {
     const clampedLevel = Math.max(0, Math.min(5, level || 0));
     const baseRarity = this.getRarityForKey(typeKey);
+
+    if (this.isEvolutionDisabledBuilding(typeKey)) {
+      return {
+        buildMult: 1,
+        prodMult: 1,
+        rewardMult: 1,
+        bonusLabel: "Sin evolucion"
+      };
+    }
 
     if (this.isDecorativeHouse(typeKey)) {
       const aura = this.getDecorAuraFromLevel(clampedLevel);
@@ -1956,6 +4280,7 @@ class MainScene extends Phaser.Scene {
   openEvolutionModal(b) {
     if (!b || !this.economy) return;
     if (!b.isBuilt) return;
+    if (this.isEvolutionDisabledBuilding(b.typeKey)) return;
     this.setCursorMode();
     const existing = document.getElementById("evo-modal");
     if (existing) existing.remove();
@@ -2907,6 +5232,7 @@ class MainScene extends Phaser.Scene {
 
     const b = buildings.get(id);
     if (!b) return;
+    if (this.isBuildingInfoLocked(b, Date.now())) return;
     this.setCursorMode();
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
@@ -3332,12 +5658,19 @@ class MainScene extends Phaser.Scene {
     };
 
     const rotateBtn = modal.querySelector("#bldRotate");
-    if (rotateBtn) rotateBtn.onclick = () => {
-      this.closeBuildingInfoModal();
-      this.rotateSelected();
-      this.closeBuildingMenu();
-      this.setCursorMode();
-    };
+    if (rotateBtn) {
+      if (!this.canRotateBuilding(b.typeKey)) {
+        rotateBtn.style.display = "none";
+        rotateBtn.setAttribute("disabled", "true");
+      } else {
+        rotateBtn.onclick = () => {
+          this.closeBuildingInfoModal();
+          this.rotateSelected();
+          this.closeBuildingMenu();
+          this.setCursorMode();
+        };
+      }
+    }
 
     const deleteBtn = modal.querySelector("#bldDelete");
     if (deleteBtn) deleteBtn.onclick = () => {
@@ -3483,8 +5816,14 @@ class MainScene extends Phaser.Scene {
     const evoStats = this.getEvolutionStats(b.typeKey, evoStage, evoLevelClamped);
     if (evoDiamonds) evoDiamonds.innerHTML = this.buildEvoDiamonds(evoLevelClamped);
     if (evoHint) evoHint.textContent = `Evolucion ${(evoStage >= 5 ? evoStage : baseRarity)}\u2605: ${evoLevelClamped}/5 (${evoStats.bonusLabel})`;
+    const noEvolution = this.isEvolutionDisabledBuilding(b.typeKey);
+    if (noEvolution && evoHint) evoHint.textContent = "Evolucion no disponible";
+
     if (evoBtn) {
-      if (!b.isBuilt) {
+      if (noEvolution) {
+        evoBtn.setAttribute("disabled", "true");
+        evoBtn.textContent = "Sin evolucion";
+      } else if (!b.isBuilt) {
         evoBtn.setAttribute("disabled", "true");
         evoBtn.textContent = "En construccion";
       } else if (evoStage >= 6 && evoLevelClamped >= 5) {
@@ -3499,7 +5838,7 @@ class MainScene extends Phaser.Scene {
       }
     }
     if (transBtn) {
-      const ready = (b.isBuilt && baseRarity === 5 && evoStage === 5 && evoLevelClamped >= 5);
+      const ready = !noEvolution && (b.isBuilt && baseRarity === 5 && evoStage === 5 && evoLevelClamped >= 5);
       if (ready) {
         transBtn.style.display = "inline-block";
         transBtn.removeAttribute("disabled");
@@ -3516,6 +5855,13 @@ class MainScene extends Phaser.Scene {
 
     const b = buildings.get(id);
     if (!b) return;
+    if (this.isBuildingInfoLocked(b, Date.now())) return;
+    if (!this.canRotateBuilding(b.typeKey)) {
+      // Las carreteras no se giran: se conectan/compactan automaticamente por adyacencia.
+      this.normalizeRoadBuildingState(b, true);
+      if (b.cells?.length) this.refreshRoadVisualsAroundCells(b.cells, 1);
+      return;
+    }
 
     b.rotationStep = ((b.rotationStep || 0) + 1) % 4;
 
@@ -3539,20 +5885,27 @@ class MainScene extends Phaser.Scene {
 
     const b = buildings.get(id);
     if (!b) return;
+    if (this.isBuildingInfoLocked(b, Date.now())) return;
+    const isRoad = b.typeKey === "road_main_2x2";
+    if (isRoad) this.normalizeRoadBuildingState(b, true);
 
     const min = b.cells.reduce((m, t) => ((t.r + t.c) < (m.r + m.c) ? t : m), b.cells[0]);
 
     freeBuilding(id);
     b.gfx.setVisible(false);
     b.sprite?.setVisible(false);
+    b.roadSprite?.setVisible(false);
+    if (isRoad && b.cells?.length) {
+      this.refreshRoadVisualsAroundCells(b.cells, 1);
+    }
 
     this.moveMode = {
       id,
       size: b.size,
       typeKey: b.typeKey,
       from: { r: min.r, c: min.c },
-      border: b.border || 0x22c55e,
-      rotationStep: b.rotationStep || 0,
+      border: isRoad ? (BUILDING_TYPES.road_main_2x2.border) : (b.border || 0x22c55e),
+      rotationStep: isRoad ? 0 : (b.rotationStep || 0),
       evoLevel: b.evoLevel || 0
     };
 
@@ -3599,15 +5952,23 @@ class MainScene extends Phaser.Scene {
     const b = buildings.get(mm.id);
     if (!b) return;
     const now = Date.now();
+    const prevCells = [];
+    for (let rr = mm.from.r; rr < mm.from.r + mm.size; rr++) {
+      for (let cc = mm.from.c; cc < mm.from.c + mm.size; cc++) {
+        if (inBounds(rr, cc)) prevCells.push({ r: rr, c: cc });
+      }
+    }
 
     b.cells = occupy(mm.id, mm.size, r0, c0);
-    b.rotationStep = mm.rotationStep;
-    b.border = mm.border;
+    b.rotationStep = this.canRotateBuilding(b.typeKey) ? mm.rotationStep : 0;
+    b.border = this.canRotateBuilding(b.typeKey) ? mm.border : (BUILDING_TYPES.road_main_2x2.border);
     this.recalculateAllBuildingStats(now);
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     b.gfx.clear();
-    if (b.sprite) {
+    if (b.typeKey === "road_main_2x2") {
+      this.redrawRoadBuildingVisual(b, 0.85);
+    } else if (b.sprite) {
       if (b.isBuilt) {
         this.updateBuildingSpriteVisual(b);
         b.sprite.setVisible(true);
@@ -3628,6 +5989,10 @@ class MainScene extends Phaser.Scene {
     this.moveMode = null;
     this.clearBuffAreaGhost();
     this.modeText.setText(this.modeLabel());
+    if (b.typeKey === "road_main_2x2") {
+      this.refreshRoadVisualsAroundCells(prevCells, 1);
+      this.refreshRoadVisualsAroundCells(b.cells, 1);
+    }
   }
 
   cancelMoveMode(restore) {
@@ -3638,12 +6003,15 @@ class MainScene extends Phaser.Scene {
 
     if (b && restore) {
       b.cells = occupy(id, size, from.r, from.c);
-      b.border = border;
-      b.rotationStep = rotationStep;
+      b.border = this.canRotateBuilding(b.typeKey) ? border : (BUILDING_TYPES.road_main_2x2.border);
+      b.rotationStep = this.canRotateBuilding(b.typeKey) ? rotationStep : 0;
 
       const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
       b.gfx.clear();
-      if (b.sprite) {
+      if (b.typeKey === "road_main_2x2") {
+        this.redrawRoadBuildingVisual(b, 0.85);
+        this.refreshRoadVisualsAroundCells(b.cells, 1);
+      } else if (b.sprite) {
         if (b.isBuilt) {
           this.updateBuildingSpriteVisual(b);
           b.sprite.setVisible(true);
@@ -3677,14 +6045,18 @@ class MainScene extends Phaser.Scene {
   destroyBuilding(id) {
     const b = buildings.get(id);
     if (!b) return;
+    if (this.isBuildingInfoLocked(b, Date.now())) return;
+    const wasRoad = b.typeKey === "road_main_2x2";
+    const oldCells = Array.isArray(b.cells) ? b.cells.map((t) => ({ r: t.r, c: t.c })) : [];
 
-    // [OK] devolver item al inventario (si no es el verde base)
-    if (this.economy && b.typeKey && b.typeKey !== "green_1") {
+    // [OK] devolver item solo si fue consumido al construir.
+    if (this.economy && b.typeKey && b.typeKey !== "green_1" && b.inventoryConsumed !== false) {
       this.economy.addItem?.(b.typeKey, 1);
     }
 
     b.gfx.destroy();
     b.sprite?.destroy();
+    b.roadSprite?.destroy();
     b.buildBar?.destroy();
     b.prodBar?.destroy();
     b.glowGfx?.destroy();
@@ -3698,6 +6070,9 @@ class MainScene extends Phaser.Scene {
     freeBuilding(id);
     this.recalculateAllBuildingStats(Date.now());
     this.clearBuffAreaGhost();
+    if (wasRoad && oldCells.length) {
+      this.refreshRoadVisualsAroundCells(oldCells, 1);
+    }
   }
 
   collectBuildingReward(id) {
@@ -3728,6 +6103,9 @@ class MainScene extends Phaser.Scene {
     const def = BUILDING_TYPES[typeKey] || BUILDING_TYPES.green_1;
 
     const size = def.size;
+    const previewRotationStep = this.canRotateBuilding(typeKey)
+      ? (((this.pending?.rotationStep ?? this.getBuildPreview().rotationStep ?? 0) % 4 + 4) % 4)
+      : 0;
     const rarity = this.getRarityForKey(typeKey);
     const mods = RARITY_MODS[rarity] || RARITY_MODS[2];
     const baseBuild = def.buildSeconds ?? 0;
@@ -3747,11 +6125,14 @@ class MainScene extends Phaser.Scene {
       : { exp: 0, gold: 0 };
 
     // validar espacio
-    if (!canPlace(size, r0, c0)) return;
+    if (!this.canPlaceBuildAt(typeKey, size, r0, c0)) return;
+
+    const forcedRoadPiece = (typeKey === "road_main_2x2") ? this.getAdminForcedRoadPiece() : 0;
+    const isTempAdminRoadPlacement = (typeKey === "road_main_2x2" && forcedRoadPiece > 0);
 
     // [OK] si no es el verde basico, debe existir en inventario y se consume
-    // (si quieres que verde tambien consuma, lo cambiamos luego)
-    if (this.economy && typeKey !== "green_1") {
+    // excepto en el modo temporal de piezas de carretera del admin.
+    if (this.economy && typeKey !== "green_1" && !isTempAdminRoadPlacement) {
       const ok = this.economy.consumeItem(typeKey, 1);
       if (!ok) {
         console.log("No tienes ese item en inventario:", typeKey);
@@ -3864,6 +6245,10 @@ class MainScene extends Phaser.Scene {
       cells,
       gfx,
       sprite,
+      roadSprite: null,
+      roadSpriteImg: null,
+      roadResolvedPiece: 0,
+      roadResolvedRot: 0,
       buildBar,
       prodBar,
       rewardGoldIcon,
@@ -3889,11 +6274,21 @@ class MainScene extends Phaser.Scene {
       prodStart: effBuild <= 0 ? now : buildEnd, // empieza cuando termina de construir
       lastRewardAt: 0,
       border: def.border,
-      rotationStep: 0
+      rotationStep: previewRotationStep,
+      roadForcedPiece: (typeKey === "road_main_2x2") ? forcedRoadPiece : 0,
+      inventoryConsumed: (typeKey !== "green_1") && !isTempAdminRoadPlacement,
+      residentNpcSpawned: false,
+      constructAnimActive: false,
+      constructAnimUntil: 0
     });
 
     const b = buildings.get(id);
     if (b) this.applyEvolution(b, now);
+    if (b?.typeKey === "road_main_2x2") {
+      this.normalizeRoadBuildingState(b, false);
+      this.redrawRoadBuildingVisual(b, 0.85);
+      this.refreshRoadVisualsAroundCells(b.cells, 1);
+    }
     if (b?.sprite) {
       this.updateBuildingSpriteVisual(b, b.isBuilt ? 1 : 0.3);
       if (b.isBuilt) {
@@ -3905,6 +6300,7 @@ class MainScene extends Phaser.Scene {
         b.gfx.setVisible(true);
       }
     }
+    if (b?.isBuilt) this.onBuildingConstructed(b, now);
   }
 
   getBuildingAnchor(b) {
@@ -3937,6 +6333,173 @@ class MainScene extends Phaser.Scene {
     g.lineTo(x - w / 2, y);
     g.closePath();
     g.strokePath();
+  }
+
+  drawRoadCellsCompact(g, cells, color, alpha, borderColor = color) {
+    if (!g || !Array.isArray(cells) || !cells.length) return;
+
+    const a = Phaser.Math.Clamp(alpha ?? 1, 0, 1);
+    const veredaColor = 0xf8fafc; // vereda blanca
+    const pistaColor = 0x6b7280;  // pista gris
+    const negro = 0x0b0b0b;       // borde negro
+
+    // Esperado para road_main_2x2: bloque 2x2.
+    const r0 = Math.min(...cells.map((c) => c.r));
+    const c0 = Math.min(...cells.map((c) => c.c));
+
+    // Fallback por seguridad (si alguna vez no es 2x2).
+    if (cells.length !== 4) {
+      const sorted = [...cells].sort((aa, bb) => (aa.r + aa.c) - (bb.r + bb.c));
+      for (const cell of sorted) {
+        const p = isoToScreen(cell.r, cell.c);
+        this.drawDiamond(g, p.x, p.y, TILE_W, TILE_H, veredaColor, a);
+        g.lineStyle(2, negro, a);
+        this.outlineDiamond(g, p.x, p.y, TILE_W, TILE_H);
+      }
+      return;
+    }
+
+    const pTL = isoToScreen(r0, c0);
+    const pTR = isoToScreen(r0, c0 + 1);
+    const pBL = isoToScreen(r0 + 1, c0);
+    const pBR = isoToScreen(r0 + 1, c0 + 1);
+
+    const top = { x: pTL.x, y: pTL.y - (TILE_H / 2) };
+    const right = { x: pTR.x + (TILE_W / 2), y: pTR.y };
+    const bottom = { x: pBR.x, y: pBR.y + (TILE_H / 2) };
+    const left = { x: pBL.x - (TILE_W / 2), y: pBL.y };
+    const center = { x: (pTL.x + pTR.x + pBL.x + pBR.x) / 4, y: (pTL.y + pTR.y + pBL.y + pBR.y) / 4 };
+
+    const north = this.isRoadCell(r0 - 1, c0) || this.isRoadCell(r0 - 1, c0 + 1);
+    const east = this.isRoadCell(r0, c0 + 2) || this.isRoadCell(r0 + 1, c0 + 2);
+    const south = this.isRoadCell(r0 + 2, c0) || this.isRoadCell(r0 + 2, c0 + 1);
+    const west = this.isRoadCell(r0, c0 - 1) || this.isRoadCell(r0 + 1, c0 - 1);
+
+    // 1) Base del tramo 2x2 (vereda).
+    g.fillStyle(veredaColor, a);
+    g.beginPath();
+    g.moveTo(top.x, top.y);
+    g.lineTo(right.x, right.y);
+    g.lineTo(bottom.x, bottom.y);
+    g.lineTo(left.x, left.y);
+    g.closePath();
+    g.fillPath();
+
+    // 2) Bordes negros gruesos solo en lados externos (evita corte feo interno).
+    const drawEdge = (a0, b0) => {
+      g.beginPath();
+      g.moveTo(a0.x, a0.y);
+      g.lineTo(b0.x, b0.y);
+      g.strokePath();
+    };
+    g.lineStyle(Math.max(3, Math.round(TILE_H * 0.16)), negro, a);
+    if (!north) drawEdge(top, right);
+    if (!east) drawEdge(right, bottom);
+    if (!south) drawEdge(bottom, left);
+    if (!west) drawEdge(left, top);
+
+    // 3) Conectores de pista (I/L/T/X automáticos por vecinos de bloque 2x2).
+    const toNorth = { x: (top.x + right.x) / 2, y: (top.y + right.y) / 2 };
+    const toEast = { x: (right.x + bottom.x) / 2, y: (right.y + bottom.y) / 2 };
+    const toSouth = { x: (bottom.x + left.x) / 2, y: (bottom.y + left.y) / 2 };
+    const toWest = { x: (left.x + top.x) / 2, y: (left.y + top.y) / 2 };
+
+    const connections = [];
+    if (north) connections.push(toNorth);
+    if (east) connections.push(toEast);
+    if (south) connections.push(toSouth);
+    if (west) connections.push(toWest);
+
+    const drawPoly = (pts, fill) => {
+      g.fillStyle(fill, a);
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.closePath();
+      g.fillPath();
+    };
+
+    const quadFromCenter = (to, halfW, extend = 0) => {
+      const vx = to.x - center.x;
+      const vy = to.y - center.y;
+      const len = Math.hypot(vx, vy) || 1;
+      const ux = vx / len;
+      const uy = vy / len;
+      const nx = -vy / len;
+      const ny = vx / len;
+      const ex = to.x + (ux * extend);
+      const ey = to.y + (uy * extend);
+      return [
+        { x: center.x + (nx * halfW), y: center.y + (ny * halfW) },
+        { x: center.x - (nx * halfW), y: center.y - (ny * halfW) },
+        { x: ex - (nx * halfW), y: ey - (ny * halfW) },
+        { x: ex + (nx * halfW), y: ey + (ny * halfW) }
+      ];
+    };
+
+    const seamCoverAt = (to, halfW, halfLen) => {
+      const vx = to.x - center.x;
+      const vy = to.y - center.y;
+      const len = Math.hypot(vx, vy) || 1;
+      const ux = vx / len;
+      const uy = vy / len;
+      const nx = -vy / len;
+      const ny = vx / len;
+      return [
+        { x: to.x + (ux * halfLen) + (nx * halfW), y: to.y + (uy * halfLen) + (ny * halfW) },
+        { x: to.x + (ux * halfLen) - (nx * halfW), y: to.y + (uy * halfLen) - (ny * halfW) },
+        { x: to.x - (ux * halfLen) - (nx * halfW), y: to.y - (uy * halfLen) - (ny * halfW) },
+        { x: to.x - (ux * halfLen) + (nx * halfW), y: to.y - (uy * halfLen) + (ny * halfW) }
+      ];
+    };
+
+    const outerHalf = Math.max(6, Math.round(TILE_H * 0.35));
+    const innerHalf = Math.max(4, outerHalf - Math.max(2, Math.round(TILE_H * 0.11)));
+    const overlap = Math.max(1.5, TILE_H * 0.10);
+    const seamCoverLen = Math.max(1.2, TILE_H * 0.09);
+
+    // Conectores rectos (sin bordes redondos).
+    for (const to of connections) {
+      drawPoly(quadFromCenter(to, outerHalf, overlap), negro);
+    }
+    for (const to of connections) {
+      drawPoly(quadFromCenter(to, innerHalf, overlap), pistaColor);
+    }
+    // Tapa juntas entre bloques 2x2 para eliminar lineas negras visibles.
+    for (const to of connections) {
+      drawPoly(seamCoverAt(to, innerHalf + 0.2, seamCoverLen), pistaColor);
+    }
+
+    // Núcleo central recto (diamante), también sin círculos.
+    const cOuter = [
+      { x: center.x, y: center.y - (TILE_H * 0.34) },
+      { x: center.x + (TILE_W * 0.34), y: center.y },
+      { x: center.x, y: center.y + (TILE_H * 0.34) },
+      { x: center.x - (TILE_W * 0.34), y: center.y }
+    ];
+    const cInner = [
+      { x: center.x, y: center.y - (TILE_H * 0.23) },
+      { x: center.x + (TILE_W * 0.23), y: center.y },
+      { x: center.x, y: center.y + (TILE_H * 0.23) },
+      { x: center.x - (TILE_W * 0.23), y: center.y }
+    ];
+    drawPoly(cOuter, negro);
+    drawPoly(cInner, pistaColor);
+  }
+
+  redrawRoadBuildingVisual(b, alpha = 0.85) {
+    if (!b || b.typeKey !== "road_main_2x2" || !b.gfx) return;
+    const def = BUILDING_TYPES.road_main_2x2;
+    this.normalizeRoadBuildingState(b, false);
+    const usedRoadKoto = this.applyRoadKotoSpriteVisual(b, alpha);
+    b.gfx.clear();
+    if (usedRoadKoto) {
+      b.gfx.setVisible(false);
+      return;
+    }
+    this.drawRoadCellsCompact(b.gfx, b.cells, def.fill, alpha, def.border);
+    b.gfx.setVisible(true);
+    b.roadSprite?.setVisible(false);
   }
 
   drawCells(g, cells, color, alpha, borderColor = color) {
@@ -4074,6 +6637,8 @@ class MainScene extends Phaser.Scene {
     g.beginPath(); g.moveTo(vRight.x, vRight.y); g.lineTo(vBottom.x, vBottom.y); g.strokePath();
     g.beginPath(); g.moveTo(vBottom.x, vBottom.y); g.lineTo(vLeft.x, vLeft.y); g.strokePath();
     g.beginPath(); g.moveTo(vLeft.x, vLeft.y); g.lineTo(vTop.x, vTop.y); g.strokePath();
+
+    this.drawGridCodeOverlay();
   }
   updateBuildingsTimers() {
     const now = Date.now();
@@ -4148,6 +6713,7 @@ class MainScene extends Phaser.Scene {
             this.drawCells(b.gfx, b.cells, def.fill, 0.85, def.border);
             b.gfx.setVisible(true);
           }
+          this.onBuildingConstructed(b, now);
         }
 
         this.updateBuildingInfoModal(b, def, now);
@@ -4384,6 +6950,19 @@ if (typeof document !== "undefined" && document.fonts?.load) {
 } else {
   bootGame();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
