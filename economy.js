@@ -1,4 +1,4 @@
-// =========================
+﻿// =========================
 // ECONOMY SYSTEM (FULL)
 // - Oro + Level/EXP con barra
 // - Deseos separados (Perm / Lim)
@@ -20,7 +20,7 @@ const YAPA_WISH_COST_LIM = 150;
 const ITEM_DEFS = {
   // ===== VERDE (1\u2605/2\u2605/3\u2605) =====
   green_1:       { key: "green_1",       name: "Casa Decorativa", icon: GREEN_HOUSE_ICON_HTML, size: 1, rarity: 1 },
-  road_main_2x2:        { key: "road_main_2x2",        name: "Carretera 2x2",  icon: "\u2B1C", size: 2, rarity: 1 },
+  road_2:        { key: "road_2",        name: "Carretera 2x2",  icon: "⬜", size: 2, rarity: 1 },
   green_2:       { key: "green_2",       name: "Verde 2x2",     icon: "\uD83D\uDFE9", size: 2, rarity: 2 },
   green_3:       { key: "green_3",       name: "Verde 3x3",     icon: "\uD83D\uDFE9", size: 3, rarity: 3 },
   green_4:       { key: "green_4",       name: "Verde 4x4",     icon: "\uD83D\uDFE9\u2728", size: 4, rarity: 4 },
@@ -118,7 +118,7 @@ class EconomySystem {
     // { itemKey: count }
     this.inventory = {
       green_1: 5,
-      road_main_2x2: 120,
+      road_2: 120,
       green_2: 3,
       green_3: 2,
       green_4: 1
@@ -688,7 +688,7 @@ class EconomySystem {
           <div class="yapa-bottom">
             <button id="yapaScanQrBtn" class="yapa-cta yapa-cta-outline" data-yapa-note="Escanear QR">ESCANEAR QR</button>
             <button id="yapaYaparBtn" class="yapa-cta yapa-cta-fill" data-yapa-note="YAPAR">YAPAR</button>
-            <div id="yapaBonusTimer" class="yapa-bonus-timer">Bono Yapa: sin señal</div>
+            <div id="yapaBonusTimer" class="yapa-bonus-timer">Bono Yapa: sin seÃ±al</div>
           </div>
         </div>
       </div>
@@ -840,7 +840,7 @@ class EconomySystem {
 
     const status = this.scene?.getYapaBonusStatus?.(Date.now());
     if (!status || !status.active) {
-      timerEl.textContent = "Bono Yapa: sin señal";
+      timerEl.textContent = "Bono Yapa: sin seÃ±al";
       timerEl.classList.remove("active");
       return;
     }
@@ -1073,14 +1073,7 @@ class EconomySystem {
           <button id="adminSpawnQrBtn" class="admin-tool-btn admin-tool-qr">Aparecer QR</button>
         </div>
         <div id="adminList" class="inv-list admin-list"></div>
-        <div class="admin-road-panel">
-          <div class="admin-road-head">
-            <div class="admin-road-title">Carreteras temporales (sin consumo)</div>
-            <div class="admin-road-sub">Usa R01..R45 para guiar conexiones manualmente.</div>
-          </div>
-          <div id="adminRoadList" class="admin-road-list"></div>
-        </div>
-        <small id="adminHint" class="inv-hint">Toca un item para a\u00F1adirlo al inventario o elige una carretera temporal.</small>
+        <small id="adminHint" class="inv-hint">Toca un item para a\u00F1adirlo al inventario.</small>
       </div>
     `;
 
@@ -1128,7 +1121,6 @@ class EconomySystem {
     });
 
     this.renderAdminList(modal.querySelector("#adminList"));
-    this.renderAdminRoadPieceList(modal.querySelector("#adminRoadList"), setHint);
   }
 
   renderAdminList(listEl) {
@@ -1156,45 +1148,6 @@ class EconomySystem {
         if (!key) return;
         this.addItem(key, 1);
         this.renderAdminList(listEl);
-      });
-    });
-  }
-
-  renderAdminRoadPieceList(listEl, setHint = null) {
-    if (!listEl) return;
-    const scene = this.scene;
-    const activePiece = Number(scene?.getAdminForcedRoadPiece?.() || 0);
-    const rows = [];
-
-    rows.push(`
-      <button class="admin-road-btn admin-road-auto ${activePiece === 0 ? "is-active" : ""}" data-road-piece="0">
-        AUTO
-      </button>
-    `);
-
-    for (let i = 1; i <= 45; i++) {
-      const id = String(i).padStart(2, "0");
-      rows.push(`
-        <button class="admin-road-btn ${activePiece === i ? "is-active" : ""}" data-road-piece="${i}">
-          R${id}
-        </button>
-      `);
-    }
-
-    listEl.innerHTML = rows.join("");
-    listEl.querySelectorAll("[data-road-piece]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const piece = Number(btn.getAttribute("data-road-piece") || 0);
-        if (piece > 0) {
-          const applied = scene?.setAdminRoadPiecePlacement?.(piece) ?? 0;
-          if (setHint) setHint(`Modo temporal activo: R${String(applied).padStart(2, "0")} (sin consumo).`);
-        } else {
-          scene?.clearAdminRoadPiecePlacement?.();
-          scene.selectedBuildKey = "road_main_2x2";
-          scene.setBuildMode?.();
-          if (setHint) setHint("Modo carretera normal activo (AUTO, consume inventario).");
-        }
-        this.renderAdminRoadPieceList(listEl, setHint);
       });
     });
   }
@@ -1233,7 +1186,6 @@ class EconomySystem {
   selectBuildItem(key) {
     if (!key || !this.scene) return;
     if (document.getElementById("building-modal") || document.getElementById("evo-modal")) return;
-    this.scene.clearAdminRoadPiecePlacement?.();
     this.scene.selectedBuildKey = key;
     this.scene.setBuildMode?.();
   }

@@ -1,4 +1,4 @@
-// =========================
+ï»¿// =========================
 // MAPA (10 veces mas grande)
 // =========================
 const MAP_W = 700;
@@ -17,9 +17,6 @@ const WORLD_TILE_GRASS_COLOR = 0x84c253;
 const WORLD_BG_GRID_LINE_COLOR = 0x5e8f3c;
 const WORLD_GRID_LINE_COLOR = 0x6ea646;
 const WORLD_MAP_BORDER_COLOR = 0x4f7f2b;
-const ROADKOTO_PIECES = 45;
-const ROADKOTO_ISO_CHILD_ANGLE = 45;
-const ROADKOTO_ISO_PARENT_SCALE_Y = 0.5;
 
 // =========================
 // DECOR AURA (Casa Decorativa green_1)
@@ -48,8 +45,8 @@ const BUILDING_TYPES = {
     reward: { exp: 0, gold: 0 },
     glow: false
   },
-  road_main_2x2: {
-    key: "road_main_2x2",
+  road_2: {
+    key: "road_2",
     label: "Carretera 2x2",
     size: 2,
     fill: 0x6b7280,
@@ -269,8 +266,6 @@ const TRAFFIC_NPC_BLOCKED_SIDE_OFFSET_TILES = 0;
 const TRAFFIC_NPC_SIDE_LERP = 0.18;
 const TRAFFIC_NPC_DIR_LERP = 0.22;
 const TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN = 0.06;
-const TRAFFIC_NPC_OCCLUSION_SCAN_RANGE = 2;
-const TRAFFIC_NPC_OCCLUSION_FRONT_EPS = 0.12;
 const TRAFFIC_NPC_CROSS_WAIT_MIN_MS = 900;
 const TRAFFIC_NPC_CROSS_WAIT_MAX_MS = 2200;
 const TRAFFIC_CAR_NEAR_RADIUS_TILES = 2.4;
@@ -397,10 +392,6 @@ class MainScene extends Phaser.Scene {
     this.load.image("green_house_1x1_giro1", "img/green_casa1x1_giro1.png");
     this.load.image("green_house_1x1_giro2", "img/green_casa1x1_giro2.png");
     this.load.image("green_house_1x1_giro3", "img/green_casa1x1_giro3.png");
-    for (let i = 1; i <= ROADKOTO_PIECES; i++) {
-      const id = String(i).padStart(2, "0");
-      this.load.image(`roadkoto_${id}`, `img/roadkoto-${id}.jpg`);
-    }
   }
 
   create() {
@@ -474,15 +465,6 @@ class MainScene extends Phaser.Scene {
     this.trafficCars = [];
     this.streetNpcs = [];
     this.npcDebugEnabled = false;
-    this.gridCodeDebugEnabled = false;
-    this.gridCodeTextPool = [];
-    this.itemDirDebugEnabled = false;
-    this.itemDirDebugTextPool = [];
-    this.itemDirDebugLastDrawAt = 0;
-    this.roadPieceDebugEnabled = false;
-    this.roadPieceDebugTextPool = [];
-    this.roadPieceDebugLastDrawAt = 0;
-    this.adminForcedRoadPiece = 0;
     this.nextTrafficCarId = 1;
     this.nextStreetNpcId = 1;
 
@@ -522,57 +504,6 @@ class MainScene extends Phaser.Scene {
       this.npcDebugEnabled = !this.npcDebugEnabled;
       this.npcDebugBtn.setText(this.npcDebugEnabled ? "NPC DBG: ON" : "NPC DBG: OFF");
       if (!this.npcDebugEnabled) this.npcDebugGfx?.clear();
-      this.updateBottomHintLayout();
-    });
-    this.gridCodeBtn = regUI(
-      this.add.text(
-        16, 116,
-        "GRID DBG: OFF",
-        { fontFamily: "Arial", fontSize: "14px", color: "#bbf7d0", backgroundColor: "#0f172a" }
-      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
-        .setInteractive({ useHandCursor: true })
-    );
-    this.gridCodeBtn.on("pointerdown", (pointer) => {
-      this.uiGuard(pointer);
-      this.gridCodeDebugEnabled = !this.gridCodeDebugEnabled;
-      this.gridCodeBtn.setText(this.gridCodeDebugEnabled ? "GRID DBG: ON" : "GRID DBG: OFF");
-      if (this.gridCodeDebugEnabled) this.drawGridCodeOverlay(true);
-      else this.clearGridCodeOverlay();
-      this.updateBottomHintLayout();
-    });
-    this.itemDirDebugBtn = regUI(
-      this.add.text(
-        16, 116,
-        "ITEM NESO: OFF",
-        { fontFamily: "Arial", fontSize: "14px", color: "#fde68a", backgroundColor: "#0f172a" }
-      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
-        .setInteractive({ useHandCursor: true })
-    );
-    this.itemDirDebugBtn.on("pointerdown", (pointer) => {
-      this.uiGuard(pointer);
-      this.itemDirDebugEnabled = !this.itemDirDebugEnabled;
-      this.itemDirDebugBtn.setText(this.itemDirDebugEnabled ? "ITEM NESO: ON" : "ITEM NESO: OFF");
-      this.itemDirDebugLastDrawAt = 0;
-      if (this.itemDirDebugEnabled) this.drawItemDirectionOverlay(true);
-      else this.clearItemDirectionOverlay();
-      this.updateBottomHintLayout();
-    });
-    this.roadPieceDebugBtn = regUI(
-      this.add.text(
-        16, 146,
-        "ROAD NUM: OFF",
-        { fontFamily: "Arial", fontSize: "14px", color: "#fca5a5", backgroundColor: "#0f172a" }
-      ).setPadding(8, 5, 8, 5).setScrollFactor(0).setDepth(9999)
-        .setInteractive({ useHandCursor: true })
-    );
-    this.roadPieceDebugBtn.on("pointerdown", (pointer) => {
-      this.uiGuard(pointer);
-      this.roadPieceDebugEnabled = !this.roadPieceDebugEnabled;
-      this.roadPieceDebugBtn.setText(this.roadPieceDebugEnabled ? "ROAD NUM: ON" : "ROAD NUM: OFF");
-      this.roadPieceDebugLastDrawAt = 0;
-      if (this.roadPieceDebugEnabled) this.drawRoadPieceDebugOverlay(true);
-      else this.clearRoadPieceDebugOverlay();
-      this.updateBottomHintLayout();
     });
     this.updateBottomHintLayout();
 
@@ -584,14 +515,6 @@ class MainScene extends Phaser.Scene {
 
     this.npcDebugGfx = this.add.graphics().setDepth(34);
     this.uiCam.ignore(this.npcDebugGfx);
-    this.gridCodeLayer = this.add.layer().setDepth(33);
-    this.uiCam.ignore(this.gridCodeLayer);
-    this.itemDirDebugGfx = this.add.graphics().setDepth(35);
-    this.itemDirDebugLayer = this.add.layer().setDepth(36);
-    this.uiCam.ignore(this.itemDirDebugGfx);
-    this.uiCam.ignore(this.itemDirDebugLayer);
-    this.roadPieceDebugLayer = this.add.layer().setDepth(37);
-    this.uiCam.ignore(this.roadPieceDebugLayer);
 
     // [OK] IMPORTANTISIMO:
     // el WORLD cam ignora todos los UI -> el UI no se escala con zoom
@@ -790,7 +713,7 @@ class MainScene extends Phaser.Scene {
       const ok = this.canPlaceBuildAt(preview.typeKey, size, tile.r, tile.c);
 
       // Auto-colocar carretera: instantaneo y sin confirmacion.
-      if (preview.typeKey === "road_main_2x2") {
+      if (preview.typeKey === "road_2") {
         if (ok) this.placeBuilding(tile.r, tile.c);
         return;
       }
@@ -861,20 +784,6 @@ class MainScene extends Phaser.Scene {
     if (this.selectedBuildingId) this.updateActionButtonsPosition();
     this.updateTrafficSystem(this.game?.loop?.delta || 16);
     this.drawNpcDebugOverlay();
-    if (this.itemDirDebugEnabled) {
-      const nowDbg = Date.now();
-      if ((nowDbg - (this.itemDirDebugLastDrawAt || 0)) >= 120) {
-        this.drawItemDirectionOverlay();
-        this.itemDirDebugLastDrawAt = nowDbg;
-      }
-    }
-    if (this.roadPieceDebugEnabled) {
-      const nowRoadDbg = Date.now();
-      if ((nowRoadDbg - (this.roadPieceDebugLastDrawAt || 0)) >= 120) {
-        this.drawRoadPieceDebugOverlay();
-        this.roadPieceDebugLastDrawAt = nowRoadDbg;
-      }
-    }
 
     // [OK] AQUI:
     this.updateBuildingsTimers();
@@ -1064,23 +973,7 @@ class MainScene extends Phaser.Scene {
     const baseY = Math.max(150, h - 76);
     if (this.helpText?.setPosition) this.helpText.setPosition(16, baseY);
     if (this.modeText?.setPosition) this.modeText.setPosition(16, baseY + 28);
-    const rowY = baseY + 56;
-    let nextX = 16;
-    if (this.npcDebugBtn?.setPosition) {
-      this.npcDebugBtn.setPosition(nextX, rowY);
-      nextX += (this.npcDebugBtn.width || 110) + 10;
-    }
-    if (this.gridCodeBtn?.setPosition) {
-      this.gridCodeBtn.setPosition(nextX, rowY);
-      nextX += (this.gridCodeBtn.width || 130) + 10;
-    }
-    if (this.itemDirDebugBtn?.setPosition) {
-      this.itemDirDebugBtn.setPosition(nextX, rowY);
-      nextX += (this.itemDirDebugBtn.width || 130) + 10;
-    }
-    if (this.roadPieceDebugBtn?.setPosition) {
-      this.roadPieceDebugBtn.setPosition(16, rowY + 32);
-    }
+    if (this.npcDebugBtn?.setPosition) this.npcDebugBtn.setPosition(16, baseY + 56);
   }
 
   getBuildPreview() {
@@ -1124,7 +1017,7 @@ class MainScene extends Phaser.Scene {
   getHouseSpawnFacing(typeKey, rotationStep = 0) {
     const step = (((rotationStep || 0) % 4) + 4) % 4;
     if (typeKey === "green_1") {
-      // Mapeo pedido por diseño:
+      // Mapeo pedido por diseÃ±o:
       // 0(normal): abajo-derecha
       // 1(giro1):  abajo-izquierda
       // 2(giro2):  arriba-izquierda
@@ -1149,7 +1042,7 @@ class MainScene extends Phaser.Scene {
     const prevBuildKey = this.selectedBuildKey;
     const prevMode = mode;
 
-    this.selectedBuildKey = "road_main_2x2";
+    this.selectedBuildKey = "road_2";
 
     // Patron simple en cruz cerca del centro para que ya existan carreteras base.
     const r0 = MAP_CENTER_R - 6;
@@ -1184,7 +1077,7 @@ class MainScene extends Phaser.Scene {
   }
 
   isRoadBuilding(b) {
-    return !!(b && b.isBuilt && b.typeKey === "road_main_2x2");
+    return !!(b && b.isBuilt && b.typeKey === "road_2");
   }
 
   isRoadCell(r, c) {
@@ -1196,8 +1089,8 @@ class MainScene extends Phaser.Scene {
   }
 
   normalizeRoadBuildingState(b, redraw = false) {
-    if (!b || b.typeKey !== "road_main_2x2") return false;
-    const def = BUILDING_TYPES.road_main_2x2;
+    if (!b || b.typeKey !== "road_2") return false;
+    const def = BUILDING_TYPES.road_2;
     let changed = false;
     if ((b.rotationStep || 0) !== 0) {
       b.rotationStep = 0;
@@ -1231,313 +1124,10 @@ class MainScene extends Phaser.Scene {
 
   refreshRoadVisualsAroundCells(cells, padding = 1) {
     const ids = this.getRoadBuildingIdsAroundCells(cells, padding);
-
-    // Expandir 1 salto mas: cuando cambia un vecino, puede afectar al vecino del vecino.
-    const firstWaveCells = [];
     for (const id of ids) {
       const b = buildings.get(id);
-      if (!b?.cells?.length) continue;
-      for (const t of b.cells) firstWaveCells.push({ r: t.r, c: t.c });
+      this.redrawRoadBuildingVisual(b);
     }
-    const expandedIds = this.getRoadBuildingIdsAroundCells(firstWaveCells, 1);
-    for (const id of expandedIds) ids.add(id);
-
-    // Dos pasadas para estabilizar reglas que dependen de la pieza de vecinos.
-    for (let pass = 0; pass < 2; pass++) {
-      for (const id of ids) {
-        const b = buildings.get(id);
-        this.redrawRoadBuildingVisual(b);
-      }
-    }
-  }
-
-  getRoadKotoTextureKey(index) {
-    const n = Phaser.Math.Clamp(Math.round(Number(index) || 1), 1, ROADKOTO_PIECES);
-    return `roadkoto_${String(n).padStart(2, "0")}`;
-  }
-
-  getRoadTopLeftCell(b) {
-    if (!b?.cells?.length) return null;
-    let minR = Infinity;
-    let minC = Infinity;
-    for (const t of b.cells) {
-      if (t.r < minR) minR = t.r;
-      if (t.c < minC) minC = t.c;
-    }
-    if (!Number.isFinite(minR) || !Number.isFinite(minC)) return null;
-    return { r: minR, c: minC };
-  }
-
-  getRoadPieceFromTextureKey(texKey) {
-    const m = /^roadkoto_(\d{2})$/.exec(String(texKey || ""));
-    if (!m) return 0;
-    return Phaser.Math.Clamp(parseInt(m[1], 10) || 0, 0, ROADKOTO_PIECES);
-  }
-
-  getRoadCurrentPieceNumber(b) {
-    if (!b || b.typeKey !== "road_main_2x2") return 0;
-
-    // El numero ROAD debe corresponder al JPG que se esta viendo.
-    const texPiece = this.getRoadPieceFromTextureKey(b.roadSpriteImg?.texture?.key);
-    if (texPiece > 0) return texPiece;
-
-    const forcedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadForcedPiece) || 0), 0, ROADKOTO_PIECES);
-    if (forcedPiece > 0) return forcedPiece;
-
-    const resolvedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadResolvedPiece) || 0), 0, ROADKOTO_PIECES);
-    if (resolvedPiece > 0) return resolvedPiece;
-
-    return 0;
-  }
-
-  getRoadTopLeftParityKey(r, c) {
-    return `${(r & 1)}:${(c & 1)}`;
-  }
-
-  isRoadBlockAlignedWith(r0, c0, b) {
-    if (!b || b.typeKey !== "road_main_2x2") return false;
-    const topLeft = this.getRoadTopLeftCell(b);
-    if (!topLeft) return false;
-    return this.getRoadTopLeftParityKey(r0, c0) === this.getRoadTopLeftParityKey(topLeft.r, topLeft.c);
-  }
-
-  getRoadNeighborBuildingAtSide(r0, c0, side) {
-    const candidates = (side === "N")
-      ? [{ r: r0 - 1, c: c0 }, { r: r0 - 1, c: c0 + 1 }]
-      : (side === "E")
-        ? [{ r: r0, c: c0 + 2 }, { r: r0 + 1, c: c0 + 2 }]
-        : (side === "S")
-          ? [{ r: r0 + 2, c: c0 }, { r: r0 + 2, c: c0 + 1 }]
-          : [{ r: r0, c: c0 - 1 }, { r: r0 + 1, c: c0 - 1 }];
-
-    for (const p of candidates) {
-      if (!inBounds(p.r, p.c)) continue;
-      const b = this.getBuildingAtCell(p.r, p.c);
-      if (this.isRoadBlockAlignedWith(r0, c0, b)) return b;
-    }
-    return null;
-  }
-
-  getRoadNeighborPieceBySide(r0, c0, side) {
-    const b = this.getRoadNeighborBuildingAtSide(r0, c0, side);
-    if (!b) return 0;
-    return this.getRoadCurrentPieceNumber(b);
-  }
-
-  getRoadSpecialPieceByNeighborRoads(mask, r0, c0) {
-    const m = (mask & 15);
-
-    const centerRoad = this.getBuildingAtCell(r0, c0);
-    if (!centerRoad || centerRoad.typeKey !== "road_main_2x2") return 0;
-
-    const centerPiece = this.getRoadCurrentPieceNumber(centerRoad);
-    const n = this.getRoadNeighborPieceBySide(r0, c0, "N");
-    const e = this.getRoadNeighborPieceBySide(r0, c0, "E");
-    const s = this.getRoadNeighborPieceBySide(r0, c0, "S");
-    const w = this.getRoadNeighborPieceBySide(r0, c0, "W");
-    const diagMask = this.getRoadDiagonalMaskForBlock(r0, c0);
-
-    const hasN = n > 0;
-    const hasE = e > 0;
-    const hasS = s > 0;
-    const hasW = w > 0;
-    const hasNW = (diagMask & 1) !== 0;
-    const hasNE = (diagMask & 2) !== 0;
-    const hasSE = (diagMask & 4) !== 0;
-    const hasSW = (diagMask & 8) !== 0;
-
-    // Regla exacta solicitada: ROAD 19 con O=1 y N=2 + nueva pieza en NO.
-    // Resultado forzado: ROAD 1 -> 45, ROAD 2 -> 40, ROAD 19 -> 36.
-    if ((centerPiece === 19 || centerPiece === 36) && hasNW && (w === 1 || w === 45) && (n === 2 || n === 40)) return 36;
-    if ((centerPiece === 1 || centerPiece === 45) && hasN && (e === 19 || e === 36)) return 45;
-    if ((centerPiece === 2 || centerPiece === 40) && hasW && (s === 19 || s === 36)) return 40;
-
-    // Variantes diagonales (NO/NE/SE/SO) para ROAD 1, ROAD 2 y esquinas 17/18/19/20.
-    if (centerPiece === 1 || centerPiece === 42 || centerPiece === 43 || centerPiece === 44 || centerPiece === 45) {
-      if (hasN && hasE && !hasS && !hasW) return 45; // N+E
-      if (hasN && hasW && !hasS && !hasE) return 42; // N+O
-      if (hasS && hasE && !hasN && !hasW) return 43; // S+E
-      if (hasS && hasW && !hasN && !hasE) return 44; // S+O
-    }
-    if (centerPiece === 2 || centerPiece === 38 || centerPiece === 39 || centerPiece === 40 || centerPiece === 41) {
-      if (hasS && hasW && !hasN && !hasE) return 40; // S+O
-      if (hasS && hasE && !hasN && !hasW) return 41; // S+E
-      if (hasN && hasW && !hasS && !hasE) return 38; // N+O
-      if (hasN && hasE && !hasS && !hasW) return 39; // N+E
-    }
-    if ((centerPiece === 19 || centerPiece === 36) && hasW && hasN && hasNW) return 36; // esquina NO
-    if ((centerPiece === 20 || centerPiece === 37) && hasN && hasE && hasNE) return 37; // esquina NE
-    if ((centerPiece === 17 || centerPiece === 34) && hasE && hasS && hasSE) return 34; // esquina SE
-    if ((centerPiece === 18 || centerPiece === 35) && hasS && hasW && hasSW) return 35; // esquina SO
-
-
-    // Transiciones directas solicitadas por diseno (basadas en pieza actual).
-    if (centerPiece === 5) {
-      if (hasN && hasS) return 10;  // ROAD 5 + N + S
-      if (hasN && !hasS) return 20; // ROAD 5 + N
-      if (hasS && !hasN) return 17; // ROAD 5 + S
-    }
-    if (centerPiece === 20 && hasS) return 10; // ROAD 20 + S
-    if (centerPiece === 17 && hasN) return 10; // ROAD 17 + N
-
-
-    if (centerPiece === 3) {
-      if (hasN && hasS) return 8;  // ROAD 3 + N + S
-      if (hasS) return 18;         // ROAD 3 + S
-      if (hasN) return 19;         // ROAD 3 + N
-    }
-
-    if (centerPiece === 19 && hasS) return 18; // ROAD 19 + S
-    if (centerPiece === 19 && hasE && hasN && !hasS) return 20; // ROAD 19 puente -> 20
-
-    if (centerPiece === 18) {
-      if (hasE) return 11;         // ROAD 18 + E
-      if (hasN) return 8;          // ROAD 18 + N
-    }
-
-    if (centerPiece === 8 && hasE) return 11;  // ROAD 8 + E
-    if (centerPiece === 10 && hasW) return 11; // ROAD 10 + O
-
-    // Evitar que una segunda pasada pise ROAD 11 con variantes de cruce.
-    if (centerPiece === 11 && m === 15) return 11;
-
-    if (m !== 15) return 0;
-
-    const ruleA = (w === 1 && e === 1 && n === 2 && s === 2);
-    const ruleB = (w === 5 && e === 3 && (n === 4 || n === 2 || n === 6) && (s === 6 || s === 5 || s === 2 || s === 4));
-    if (ruleA || ruleB) return 11;
-
-    return 0;
-  }
-
-  hasRoadNeighborNorth(r0, c0) {
-    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "N");
-  }
-
-  hasRoadNeighborEast(r0, c0) {
-    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "E");
-  }
-
-  hasRoadNeighborSouth(r0, c0) {
-    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "S");
-  }
-
-  hasRoadNeighborWest(r0, c0) {
-    return !!this.getRoadNeighborBuildingAtSide(r0, c0, "W");
-  }
-
-  getRoadNeighborMaskForBlock(r0, c0) {
-    let mask = 0;
-    if (this.hasRoadNeighborNorth(r0, c0)) mask |= 1;
-    if (this.hasRoadNeighborEast(r0, c0)) mask |= 2;
-    if (this.hasRoadNeighborSouth(r0, c0)) mask |= 4;
-    if (this.hasRoadNeighborWest(r0, c0)) mask |= 8;
-    return mask;
-  }
-
-  getRoadDiagonalMaskForBlock(r0, c0) {
-    let mask = 0;
-    const markIfAlignedRoad = (rr, cc, bit) => {
-      const b = this.getBuildingAtCell(rr, cc);
-      if (this.isRoadBlockAlignedWith(r0, c0, b)) mask |= bit;
-    };
-    markIfAlignedRoad(r0 - 1, c0 - 1, 1); // NW
-    markIfAlignedRoad(r0 - 1, c0 + 2, 2); // NE
-    markIfAlignedRoad(r0 + 2, c0 + 2, 4); // SE
-    markIfAlignedRoad(r0 + 2, c0 - 1, 8); // SW
-    return mask;
-  }
-
-  hashRoadVariant(r0, c0, mask, diagMask) {
-    const a = ((r0 * 73856093) ^ (c0 * 19349663)) >>> 0;
-    const b = (((mask & 15) * 83492791) ^ ((diagMask & 15) * 2654435761)) >>> 0;
-    return (a ^ b) >>> 0;
-  }
-
-  getRoadKotoPieceForMask(mask, diagMask, r0, c0) {
-    const pick = (arr) => {
-      if (!Array.isArray(arr) || !arr.length) return 12;
-      const h = this.hashRoadVariant(r0, c0, mask, diagMask);
-      return arr[h % arr.length];
-    };
-
-    const specialPiece = this.getRoadSpecialPieceByNeighborRoads(mask, r0, c0);
-    if (specialPiece > 0) return { piece: specialPiece, rot: 0 };
-
-    // N=1, E=2, S=4, W=8
-    // Devuelve pieza base + rotacion top-down (antes de proyeccion iso).
-    switch (mask & 15) {
-      case 0: return { piece: 33, rot: 0 }; // aislado
-      // Regla guiada por diseno (conexion de 2 carreteras adyacentes):
-      // solo N -> pieza 6, solo S -> pieza 4, solo E -> pieza 5, solo O -> pieza 3
-      case 1: return { piece: 6, rot: 0 }; // solo N
-      case 2: return { piece: 5, rot: 0 }; // solo E
-      case 4: return { piece: 4, rot: 0 }; // solo S
-      case 8: return { piece: 3, rot: 0 }; // solo O
-      case 5: return { piece: 2, rot: 0 };   // N-S
-      case 10: return { piece: 1, rot: 0 };  // E-W
-      case 3: return { piece: 20, rot: 0 };   // N-E
-      case 6: return { piece: 17, rot: 0 };  // E-S
-      case 12: return { piece: 18, rot: 0 }; // S-W
-      case 9: return { piece: 19, rot: 0 }; // W-N
-      case 11: return { piece: 9, rot: 0 };    // falta N
-      case 13: return { piece: 8, rot: 0 };   // N-S + O
-      case 14: return { piece: 7, rot: 0 };  // T desde ROAD 1 + S
-      case 7: return { piece: 10, rot: 0 };   // N-S + E
-      case 15: return { piece: pick([12, 13, 14, 15, 16, 26, 27, 28, 29, 30, 31, 32, 25]), rot: 0 };
-      default: return { piece: 12, rot: 0 };
-    }
-  }
-
-  ensureRoadKotoSprite(b) {
-    if (!b || b.typeKey !== "road_main_2x2") return null;
-    if (b.roadSprite?.active && b.roadSpriteImg?.active) return b.roadSprite;
-
-    const sprite = this.add.container(0, 0).setVisible(true);
-    const img = this.add.image(0, 0, this.getRoadKotoTextureKey(12))
-      .setOrigin(0.5, 0.5)
-      .setVisible(true);
-    sprite.add(img);
-    this.uiCam.ignore(sprite);
-
-    b.roadSprite = sprite;
-    b.roadSpriteImg = img;
-    return sprite;
-  }
-
-  applyRoadKotoSpriteVisual(b, alpha = 1) {
-    if (!b || b.typeKey !== "road_main_2x2") return false;
-    const topLeft = this.getRoadTopLeftCell(b);
-    if (!topLeft) return false;
-
-    const pieceSel = this.getRoadPieceSelectionForBuilding(b);
-    if (!pieceSel?.piece) return false;
-    const texKey = this.getRoadKotoTextureKey(pieceSel.piece);
-    if (!this.textures?.exists?.(texKey)) return false;
-
-    const roadSprite = this.ensureRoadKotoSprite(b);
-    if (!roadSprite || !b.roadSpriteImg) return false;
-
-    const img = b.roadSpriteImg;
-    if (img.texture?.key !== texKey) img.setTexture(texKey);
-    img.setAlpha(Phaser.Math.Clamp(alpha, 0, 1));
-
-    const source = img.texture?.getSourceImage?.();
-    const texW = Math.max(1, Number(source?.width) || 295);
-    const blockW = TILE_W * 2;
-    const baseScale = blockW / (Math.SQRT2 * texW);
-    img.setScale(baseScale);
-    img.setAngle(ROADKOTO_ISO_CHILD_ANGLE + pieceSel.rot);
-
-    b.roadResolvedPiece = pieceSel.piece;
-    b.roadResolvedRot = pieceSel.rot;
-
-    roadSprite.setScale(1, ROADKOTO_ISO_PARENT_SCALE_Y);
-    const center = isoToScreen(topLeft.r + 0.5, topLeft.c + 0.5);
-    roadSprite.setPosition(Math.round(center.x), Math.round(center.y));
-    roadSprite.setDepth(8 + (center.y * 0.001));
-    roadSprite.setVisible(true);
-    return true;
   }
 
   getBuildingAtCell(r, c) {
@@ -1609,56 +1199,6 @@ class MainScene extends Phaser.Scene {
     const anchor = this.getBuildingAnchor(b);
     if (!anchor) return 0;
     return 30 + (anchor.y * 0.01);
-  }
-
-  getBuildingFrontIndex(b) {
-    if (!b?.cells?.length) return -Infinity;
-    let front = -Infinity;
-    for (const cell of b.cells) {
-      const idx = cell.r + cell.c;
-      if (idx > front) front = idx;
-    }
-    return front;
-  }
-
-  getNearbyNonRoadBuildings(r, c, range = TRAFFIC_NPC_OCCLUSION_SCAN_RANGE, limit = 12) {
-    const rr = Math.round(r);
-    const cc = Math.round(c);
-    const out = [];
-    const seen = new Set();
-
-    for (let tr = rr - range; tr <= rr + range; tr++) {
-      for (let tc = cc - range; tc <= cc + range; tc++) {
-        if (!inBounds(tr, tc)) continue;
-        const b = this.getBuildingAtCell(tr, tc);
-        if (!b || this.isRoadBuilding(b)) continue;
-        const id = Number(b.id) || 0;
-        if (seen.has(id)) continue;
-        seen.add(id);
-        out.push(b);
-        if (out.length >= limit) return out;
-      }
-    }
-    return out;
-  }
-
-  clampNpcDepthAgainstNearbyBuildings(baseDepth, r, c) {
-    let outDepth = baseDepth;
-    const npcFrontIndex = r + c;
-    const nearby = this.getNearbyNonRoadBuildings(r, c);
-
-    for (const b of nearby) {
-      const buildingDepth = this.getBuildingRenderDepth(b);
-      if (!(buildingDepth > 0)) continue;
-      const buildingFront = this.getBuildingFrontIndex(b);
-      if (!(buildingFront > -Infinity)) continue;
-
-      // Si el NPC esta "detras" del frente de la casa, siempre va por debajo en depth.
-      if (npcFrontIndex <= (buildingFront + TRAFFIC_NPC_OCCLUSION_FRONT_EPS)) {
-        outDepth = Math.min(outDepth, buildingDepth - TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN);
-      }
-    }
-    return outDepth;
   }
 
   getBuiltRoadCells(limit = 6000) {
@@ -1956,7 +1496,6 @@ class MainScene extends Phaser.Scene {
         npcDepth = Math.min(npcDepth, sideDepth - TRAFFIC_NPC_OCCLUSION_DEPTH_MARGIN);
       }
     }
-    npcDepth = this.clampNpcDepthAgainstNearbyBuildings(npcDepth, r, c);
     npc.sprite.setDepth(npcDepth);
   }
 
@@ -2540,427 +2079,6 @@ class MainScene extends Phaser.Scene {
     this.updateStreetNpcs(now, deltaMs);
   }
 
-  toGridCodeColumn(index) {
-    let n = Math.max(0, Math.floor(index)) + 1;
-    let out = "";
-    while (n > 0) {
-      const rem = (n - 1) % 26;
-      out = String.fromCharCode(65 + rem) + out;
-      n = Math.floor((n - 1) / 26);
-    }
-    return out || "A";
-  }
-
-  toGridCodeLabel(r, c) {
-    return `${this.toGridCodeColumn(c)}${Math.max(1, Math.floor(r) + 1)}`;
-  }
-
-  getGridCodeText(index) {
-    if (!Array.isArray(this.gridCodeTextPool)) this.gridCodeTextPool = [];
-    if (this.gridCodeTextPool[index]) return this.gridCodeTextPool[index];
-
-    const txt = this.add.text(0, 0, "", {
-      fontFamily: "Arial",
-      fontSize: "11px",
-      color: "#0f172a",
-      stroke: "#e2e8f0",
-      strokeThickness: 2
-    })
-      .setOrigin(0.5, 0.5)
-      .setDepth(33)
-      .setVisible(false);
-
-    this.gridCodeLayer?.add(txt);
-    this.gridCodeTextPool[index] = txt;
-    return txt;
-  }
-
-  clearGridCodeOverlay() {
-    if (!Array.isArray(this.gridCodeTextPool)) return;
-    for (const txt of this.gridCodeTextPool) {
-      if (txt?.active) txt.setVisible(false);
-    }
-  }
-
-  drawGridCodeOverlay(force = false) {
-    if (!this.gridCodeDebugEnabled) {
-      this.clearGridCodeOverlay();
-      return;
-    }
-
-    const cam = this.worldCam;
-    if (!cam) return;
-    cam.preRender();
-    const view = cam.worldView;
-    const xMin = view.x - TILE_W;
-    const xMax = view.x + view.width + TILE_W;
-    const yMin = view.y - TILE_H;
-    const yMax = view.y + view.height + TILE_H;
-
-    const dMin = xMin / (TILE_W / 2);
-    const dMax = xMax / (TILE_W / 2);
-    const sMin = yMin / (TILE_H / 2);
-    const sMax = yMax / (TILE_H / 2);
-
-    const rowMin = ((sMin - dMax) / 2) + MAP_CENTER_R;
-    const rowMax = ((sMax - dMin) / 2) + MAP_CENTER_R;
-    const colMin = ((sMin + dMin) / 2) + MAP_CENTER_C;
-    const colMax = ((sMax + dMax) / 2) + MAP_CENTER_C;
-
-    const buffer = 1;
-    const rStart = Math.max(0, Math.floor(rowMin) - buffer);
-    const rEnd = Math.min(MAP_H - 1, Math.ceil(rowMax) + buffer);
-    const cStart = Math.max(0, Math.floor(colMin) - buffer);
-    const cEnd = Math.min(MAP_W - 1, Math.ceil(colMax) + buffer);
-
-    const totalTiles = Math.max(1, (rEnd - rStart + 1) * (cEnd - cStart + 1));
-    let step = 1;
-    if (totalTiles > 2800) step = 2;
-    if (totalTiles > 6200) step = 3;
-    if (totalTiles > 10800) step = 4;
-    if (cam.zoom < 1.4) step = Math.max(step, 3);
-    if (cam.zoom < 1.0) step = Math.max(step, 4);
-
-    const rOffset = ((step - (rStart % step)) % step);
-    const cOffset = ((step - (cStart % step)) % step);
-    let idx = 0;
-
-    for (let r = rStart + rOffset; r <= rEnd; r += step) {
-      for (let c = cStart + cOffset; c <= cEnd; c += step) {
-        const p = isoToScreen(r, c);
-        const txt = this.getGridCodeText(idx++);
-        txt.setText(this.toGridCodeLabel(r, c));
-        txt.setPosition(p.x, p.y + 1);
-        txt.setVisible(true);
-      }
-    }
-
-    for (let i = idx; i < this.gridCodeTextPool.length; i++) {
-      const txt = this.gridCodeTextPool[i];
-      if (txt?.active) txt.setVisible(false);
-    }
-
-    if (force) {
-      // Fuerza refresh visual al alternar ON sin mover camara.
-      this.gridCodeLayer?.setDepth(33);
-    }
-  }
-
-  getAdminForcedRoadPiece() {
-    const v = Number(this.adminForcedRoadPiece) || 0;
-    return Phaser.Math.Clamp(Math.round(v), 0, ROADKOTO_PIECES);
-  }
-
-  clearAdminRoadPiecePlacement() {
-    this.adminForcedRoadPiece = 0;
-  }
-
-  setAdminRoadPiecePlacement(piece = 0) {
-    const clamped = Phaser.Math.Clamp(Math.round(Number(piece) || 0), 0, ROADKOTO_PIECES);
-    this.adminForcedRoadPiece = clamped;
-    this.selectedBuildKey = "road_main_2x2";
-    this.buildRotationStep = 0;
-    this.buildPreviewTypeKey = "road_main_2x2";
-    if (this.pending) this.clearPending();
-    this.setBuildMode();
-    return clamped;
-  }
-
-  getRoadPieceSelectionForBuilding(b) {
-    if (!b || b.typeKey !== "road_main_2x2") return { piece: 0, rot: 0, forced: false };
-
-    const forcedPiece = Phaser.Math.Clamp(Math.round(Number(b.roadForcedPiece) || 0), 0, ROADKOTO_PIECES);
-    if (forcedPiece > 0) {
-      return { piece: forcedPiece, rot: 0, forced: true };
-    }
-
-    const topLeft = this.getRoadTopLeftCell(b);
-    if (!topLeft) return { piece: 0, rot: 0, forced: false };
-
-    const mask = this.getRoadNeighborMaskForBlock(topLeft.r, topLeft.c);
-    const diagMask = this.getRoadDiagonalMaskForBlock(topLeft.r, topLeft.c);
-    const pieceSel = this.getRoadKotoPieceForMask(mask, diagMask, topLeft.r, topLeft.c) || { piece: 0, rot: 0 };
-    const piece = Phaser.Math.Clamp(Math.round(Number(pieceSel?.piece) || 0), 0, ROADKOTO_PIECES);
-    const rotRaw = Math.round(Number(pieceSel?.rot) || 0);
-    const rot = ((rotRaw % 360) + 360) % 360;
-    return { piece, rot, forced: false };
-  }
-
-  toRoadPieceAdminCode(piece = 0) {
-    const n = Phaser.Math.Clamp(Math.round(Number(piece) || 0), 0, ROADKOTO_PIECES);
-    if (n <= 0) return "R--";
-    return `R${String(n).padStart(2, "0")}`;
-  }
-
-  getRoadPieceNumberForBuilding(b) {
-    if (!b || b.typeKey !== "road_main_2x2") return 0;
-    const current = this.getRoadCurrentPieceNumber(b);
-    if (current > 0) return current;
-    return this.getRoadPieceSelectionForBuilding(b).piece;
-  }
-
-  getRoadPieceDebugText(index) {
-    if (!Array.isArray(this.roadPieceDebugTextPool)) this.roadPieceDebugTextPool = [];
-    if (this.roadPieceDebugTextPool[index]) return this.roadPieceDebugTextPool[index];
-
-    const txt = this.add.text(0, 0, "", {
-      fontFamily: "Arial",
-      fontSize: "12px",
-      fontStyle: "bold",
-      color: "#fecaca",
-      stroke: "#111827",
-      strokeThickness: 3
-    })
-      .setOrigin(0.5, 0.5)
-      .setDepth(37)
-      .setVisible(false);
-
-    this.roadPieceDebugLayer?.add(txt);
-    this.roadPieceDebugTextPool[index] = txt;
-    return txt;
-  }
-
-  clearRoadPieceDebugOverlay() {
-    if (!Array.isArray(this.roadPieceDebugTextPool)) return;
-    for (const txt of this.roadPieceDebugTextPool) {
-      if (txt?.active) txt.setVisible(false);
-    }
-  }
-
-  drawRoadPieceDebugOverlay(force = false) {
-    if (!this.roadPieceDebugEnabled) {
-      this.clearRoadPieceDebugOverlay();
-      return;
-    }
-
-    const roads = [];
-    for (const b of buildings.values()) {
-      if (!b || b.typeKey !== "road_main_2x2" || !Array.isArray(b.cells) || !b.cells.length) continue;
-      roads.push(b);
-    }
-    roads.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
-
-    let idx = 0;
-    for (const road of roads) {
-      const topLeft = this.getRoadTopLeftCell(road);
-      if (!topLeft) continue;
-      const pieceNum = this.getRoadPieceNumberForBuilding(road);
-      if (pieceNum <= 0) continue;
-      const center = isoToScreen(topLeft.r + 0.5, topLeft.c + 0.5);
-      const txt = this.getRoadPieceDebugText(idx++);
-      const mask = this.getRoadNeighborMaskForBlock(topLeft.r, topLeft.c);
-      const diagMask = this.getRoadDiagonalMaskForBlock(topLeft.r, topLeft.c);
-      const baseCode = this.toRoadPieceAdminCode(pieceNum);
-      const nCode = (mask & 1) ? 1 : 0;
-      const eCode = (mask & 2) ? 1 : 0;
-      const sCode = (mask & 4) ? 1 : 0;
-      const oCode = (mask & 8) ? 1 : 0;
-      const noCode = (diagMask & 1) ? 1 : 0;
-      const neCode = (diagMask & 2) ? 1 : 0;
-      const seCode = (diagMask & 4) ? 1 : 0;
-      const soCode = (diagMask & 8) ? 1 : 0;
-      txt.setText(`${baseCode}\nN${nCode} E${eCode} S${sCode} O${oCode} | NO${noCode} NE${neCode} SE${seCode} SO${soCode}`);
-      txt.setPosition(center.x, center.y - (TILE_H * 0.2));
-      txt.setVisible(true);
-    }
-
-    for (let i = idx; i < this.roadPieceDebugTextPool.length; i++) {
-      const txt = this.roadPieceDebugTextPool[i];
-      if (txt?.active) txt.setVisible(false);
-    }
-
-    if (force) this.roadPieceDebugLayer?.setDepth(37);
-  }
-
-  shouldShowItemDirectionBySize(size) {
-    return size === 1 || size === 2 || size === 3 || size === 4 || size === 9;
-  }
-
-  getItemDirectionCodePrefix(size) {
-    if (size === 1) return "A";
-    if (size === 2) return "B";
-    if (size === 3) return "C";
-    if (size === 4) return "D";
-    if (size === 9) return "E";
-    return "X";
-  }
-
-  getItemDirectionDebugText(index) {
-    if (!Array.isArray(this.itemDirDebugTextPool)) this.itemDirDebugTextPool = [];
-    if (this.itemDirDebugTextPool[index]) return this.itemDirDebugTextPool[index];
-
-    const txt = this.add.text(0, 0, "", {
-      fontFamily: "Arial",
-      fontSize: "13px",
-      fontStyle: "bold",
-      color: "#f8fafc",
-      stroke: "#020617",
-      strokeThickness: 3
-    })
-      .setOrigin(0.5, 0.5)
-      .setDepth(36)
-      .setVisible(false);
-
-    this.itemDirDebugLayer?.add(txt);
-    this.itemDirDebugTextPool[index] = txt;
-    return txt;
-  }
-
-  clearItemDirectionOverlay() {
-    this.itemDirDebugGfx?.clear();
-    if (!Array.isArray(this.itemDirDebugTextPool)) return;
-    for (const txt of this.itemDirDebugTextPool) {
-      if (txt?.active) txt.setVisible(false);
-    }
-  }
-
-  drawItemDirectionOverlay(force = false) {
-    const g = this.itemDirDebugGfx;
-    if (!g) return;
-    g.clear();
-    if (!this.itemDirDebugEnabled) {
-      this.clearItemDirectionOverlay();
-      return;
-    }
-
-    const counters = new Map();
-    const entries = [];
-    for (const b of buildings.values()) {
-      if (!b?.cells?.length) continue;
-      const size = Number(b.size) || Number(BUILDING_TYPES[b.typeKey]?.size) || 1;
-      if (!this.shouldShowItemDirectionBySize(size)) continue;
-      const center = this.getBuildingGridCenter(b) || b.cells[0];
-      if (!center) continue;
-
-      const isRoad = b.typeKey === "road_main_2x2";
-      let codeLabel = "";
-      if (isRoad) {
-        const roadNum = this.getRoadPieceNumberForBuilding(b);
-        codeLabel = `ROAD ${String(Math.max(0, roadNum)).padStart(2, "0")}`;
-      } else {
-        const prefix = this.getItemDirectionCodePrefix(size);
-        const nextNum = (counters.get(prefix) || 0) + 1;
-        counters.set(prefix, nextNum);
-        codeLabel = `${prefix}${nextNum}`;
-      }
-      entries.push({
-        b,
-        size,
-        center,
-        isRoad,
-        code: codeLabel
-      });
-    }
-
-    entries.sort((a, b) => (Number(a.b?.id) || 0) - (Number(b.b?.id) || 0));
-
-    let textIdx = 0;
-    for (const e of entries) {
-      const center = isoToScreen(e.center.r, e.center.c);
-      const reachTiles = Math.max(1.05, (e.size * 0.58) + 0.25);
-      const pN = isoToScreen(e.center.r - reachTiles, e.center.c);
-      const pE = isoToScreen(e.center.r, e.center.c + reachTiles);
-      const pS = isoToScreen(e.center.r + reachTiles, e.center.c);
-      const pO = isoToScreen(e.center.r, e.center.c - reachTiles);
-      const diagScale = 0.82;
-      const pNO = {
-        x: center.x + (((pN.x - center.x) + (pO.x - center.x)) * diagScale),
-        y: center.y + (((pN.y - center.y) + (pO.y - center.y)) * diagScale)
-      };
-      const pNE = {
-        x: center.x + (((pN.x - center.x) + (pE.x - center.x)) * diagScale),
-        y: center.y + (((pN.y - center.y) + (pE.y - center.y)) * diagScale)
-      };
-      const pSE = {
-        x: center.x + (((pS.x - center.x) + (pE.x - center.x)) * diagScale),
-        y: center.y + (((pS.y - center.y) + (pE.y - center.y)) * diagScale)
-      };
-      const pSO = {
-        x: center.x + (((pS.x - center.x) + (pO.x - center.x)) * diagScale),
-        y: center.y + (((pS.y - center.y) + (pO.y - center.y)) * diagScale)
-      };
-
-      g.lineStyle(1, 0x0f172a, 0.6);
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pN.x, pN.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pE.x, pE.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pS.x, pS.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pO.x, pO.y); g.strokePath();
-      g.lineStyle(1, 0x334155, 0.45);
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pNO.x, pNO.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pNE.x, pNE.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pSE.x, pSE.y); g.strokePath();
-      g.beginPath(); g.moveTo(center.x, center.y); g.lineTo(pSO.x, pSO.y); g.strokePath();
-
-      g.fillStyle(0x020617, 0.9);
-      g.fillCircle(center.x, center.y, 4);
-      g.lineStyle(1.4, 0xf8fafc, 0.92);
-      g.strokeCircle(center.x, center.y, 4);
-
-      const code = this.getItemDirectionDebugText(textIdx++);
-      code.setText(e.isRoad ? e.code : `${e.code} ${e.size}x${e.size}`);
-      code.setColor("#fde68a");
-      code.setPosition(center.x, center.y - (TILE_H * (0.58 + (e.size * 0.08))));
-      code.setVisible(true);
-
-      const n = this.getItemDirectionDebugText(textIdx++);
-      n.setText("N");
-      n.setColor("#93c5fd");
-      n.setPosition(pN.x, pN.y - 2);
-      n.setVisible(true);
-
-      const eTxt = this.getItemDirectionDebugText(textIdx++);
-      eTxt.setText("E");
-      eTxt.setColor("#86efac");
-      eTxt.setPosition(pE.x + 2, pE.y);
-      eTxt.setVisible(true);
-
-      const s = this.getItemDirectionDebugText(textIdx++);
-      s.setText("S");
-      s.setColor("#fef08a");
-      s.setPosition(pS.x, pS.y + 2);
-      s.setVisible(true);
-
-      const o = this.getItemDirectionDebugText(textIdx++);
-      o.setText("O");
-      o.setColor("#fca5a5");
-      o.setPosition(pO.x - 2, pO.y);
-      o.setVisible(true);
-      const noTxt = this.getItemDirectionDebugText(textIdx++);
-      noTxt.setText("NO");
-      noTxt.setColor("#bfdbfe");
-      noTxt.setPosition(pNO.x - 2, pNO.y - 2);
-      noTxt.setVisible(true);
-
-      const neTxt = this.getItemDirectionDebugText(textIdx++);
-      neTxt.setText("NE");
-      neTxt.setColor("#a7f3d0");
-      neTxt.setPosition(pNE.x + 2, pNE.y - 2);
-      neTxt.setVisible(true);
-
-      const seTxt = this.getItemDirectionDebugText(textIdx++);
-      seTxt.setText("SE");
-      seTxt.setColor("#fde68a");
-      seTxt.setPosition(pSE.x + 2, pSE.y + 2);
-      seTxt.setVisible(true);
-
-      const soTxt = this.getItemDirectionDebugText(textIdx++);
-      soTxt.setText("SO");
-      soTxt.setColor("#fecaca");
-      soTxt.setPosition(pSO.x - 2, pSO.y + 2);
-      soTxt.setVisible(true);
-    }
-
-    for (let i = textIdx; i < this.itemDirDebugTextPool.length; i++) {
-      const txt = this.itemDirDebugTextPool[i];
-      if (txt?.active) txt.setVisible(false);
-    }
-
-    if (force) {
-      this.itemDirDebugLayer?.setDepth(36);
-      this.itemDirDebugGfx?.setDepth(35);
-    }
-  }
-
   drawNpcDebugOverlay() {
     const g = this.npcDebugGfx;
     if (!g) return;
@@ -3069,7 +2187,7 @@ class MainScene extends Phaser.Scene {
   }
 
   playBuildingConstructDropAnimation(b, now = Date.now()) {
-    if (!b || b.typeKey === "road_main_2x2") return;
+    if (!b || b.typeKey === "road_2") return;
     if ((b.buildSeconds ?? 0) <= 0) return;
     if ((b.constructAnimUntil || 0) > now) return;
 
@@ -3612,7 +2730,7 @@ class MainScene extends Phaser.Scene {
       return;
     }
     this.selectedBuildingId = idOnTile;
-    if (selected?.typeKey === "road_main_2x2") {
+    if (selected?.typeKey === "road_2") {
       this.normalizeRoadBuildingState(selected, true);
       this.refreshRoadVisualsAroundCells(selected.cells, 1);
     }
@@ -3640,7 +2758,7 @@ class MainScene extends Phaser.Scene {
 
   getRarityForKey(typeKey) {
     if (typeKey === "green_1") return 1;
-    if (typeKey === "road_main_2x2") return 1;
+    if (typeKey === "road_2") return 1;
     if (typeKey === "green_2") return 2;
     if (typeKey === "green_3") return 3;
     if (typeKey === "green_4") return 4;
@@ -3663,7 +2781,7 @@ class MainScene extends Phaser.Scene {
     if (typeKey.startsWith("red_") || typeKey === "perm_red_9") return "red";
     if (typeKey.startsWith("blue_") || typeKey === "perm_blue_9") return "blue";
     if (typeKey === "lim_gold_2") return "gold";
-    if (typeKey === "road_main_2x2") return "road";
+    if (typeKey === "road_2") return "road";
     return null;
   }
 
@@ -3672,7 +2790,7 @@ class MainScene extends Phaser.Scene {
   }
 
   isRotationDisabledBuilding(typeKey) {
-    return typeKey === "road_main_2x2";
+    return typeKey === "road_2";
   }
 
   canRotateBuilding(typeKey) {
@@ -3680,7 +2798,7 @@ class MainScene extends Phaser.Scene {
   }
 
   isEvolutionDisabledBuilding(typeKey) {
-    return typeKey === "road_main_2x2";
+    return typeKey === "road_2";
   }
 
   getDecorAuraFromLevel(level) {
@@ -3794,7 +2912,7 @@ class MainScene extends Phaser.Scene {
     }
     if (now < this.nextYapaBonusAt) return;
 
-    // si el tiempo avanzó en segundo plano, procesa intervalos pendientes
+    // si el tiempo avanzÃ³ en segundo plano, procesa intervalos pendientes
     let dueCount = 0;
     while (now >= this.nextYapaBonusAt && dueCount < 24) {
       dueCount++;
@@ -5886,7 +5004,7 @@ class MainScene extends Phaser.Scene {
     const b = buildings.get(id);
     if (!b) return;
     if (this.isBuildingInfoLocked(b, Date.now())) return;
-    const isRoad = b.typeKey === "road_main_2x2";
+    const isRoad = b.typeKey === "road_2";
     if (isRoad) this.normalizeRoadBuildingState(b, true);
 
     const min = b.cells.reduce((m, t) => ((t.r + t.c) < (m.r + m.c) ? t : m), b.cells[0]);
@@ -5894,7 +5012,6 @@ class MainScene extends Phaser.Scene {
     freeBuilding(id);
     b.gfx.setVisible(false);
     b.sprite?.setVisible(false);
-    b.roadSprite?.setVisible(false);
     if (isRoad && b.cells?.length) {
       this.refreshRoadVisualsAroundCells(b.cells, 1);
     }
@@ -5904,7 +5021,7 @@ class MainScene extends Phaser.Scene {
       size: b.size,
       typeKey: b.typeKey,
       from: { r: min.r, c: min.c },
-      border: isRoad ? (BUILDING_TYPES.road_main_2x2.border) : (b.border || 0x22c55e),
+      border: isRoad ? (BUILDING_TYPES.road_2.border) : (b.border || 0x22c55e),
       rotationStep: isRoad ? 0 : (b.rotationStep || 0),
       evoLevel: b.evoLevel || 0
     };
@@ -5961,12 +5078,12 @@ class MainScene extends Phaser.Scene {
 
     b.cells = occupy(mm.id, mm.size, r0, c0);
     b.rotationStep = this.canRotateBuilding(b.typeKey) ? mm.rotationStep : 0;
-    b.border = this.canRotateBuilding(b.typeKey) ? mm.border : (BUILDING_TYPES.road_main_2x2.border);
+    b.border = this.canRotateBuilding(b.typeKey) ? mm.border : (BUILDING_TYPES.road_2.border);
     this.recalculateAllBuildingStats(now);
 
     const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
     b.gfx.clear();
-    if (b.typeKey === "road_main_2x2") {
+    if (b.typeKey === "road_2") {
       this.redrawRoadBuildingVisual(b, 0.85);
     } else if (b.sprite) {
       if (b.isBuilt) {
@@ -5989,7 +5106,7 @@ class MainScene extends Phaser.Scene {
     this.moveMode = null;
     this.clearBuffAreaGhost();
     this.modeText.setText(this.modeLabel());
-    if (b.typeKey === "road_main_2x2") {
+    if (b.typeKey === "road_2") {
       this.refreshRoadVisualsAroundCells(prevCells, 1);
       this.refreshRoadVisualsAroundCells(b.cells, 1);
     }
@@ -6003,12 +5120,12 @@ class MainScene extends Phaser.Scene {
 
     if (b && restore) {
       b.cells = occupy(id, size, from.r, from.c);
-      b.border = this.canRotateBuilding(b.typeKey) ? border : (BUILDING_TYPES.road_main_2x2.border);
+      b.border = this.canRotateBuilding(b.typeKey) ? border : (BUILDING_TYPES.road_2.border);
       b.rotationStep = this.canRotateBuilding(b.typeKey) ? rotationStep : 0;
 
       const def = BUILDING_TYPES[b.typeKey] || BUILDING_TYPES.green_1;
       b.gfx.clear();
-      if (b.typeKey === "road_main_2x2") {
+      if (b.typeKey === "road_2") {
         this.redrawRoadBuildingVisual(b, 0.85);
         this.refreshRoadVisualsAroundCells(b.cells, 1);
       } else if (b.sprite) {
@@ -6046,17 +5163,16 @@ class MainScene extends Phaser.Scene {
     const b = buildings.get(id);
     if (!b) return;
     if (this.isBuildingInfoLocked(b, Date.now())) return;
-    const wasRoad = b.typeKey === "road_main_2x2";
+    const wasRoad = b.typeKey === "road_2";
     const oldCells = Array.isArray(b.cells) ? b.cells.map((t) => ({ r: t.r, c: t.c })) : [];
 
-    // [OK] devolver item solo si fue consumido al construir.
-    if (this.economy && b.typeKey && b.typeKey !== "green_1" && b.inventoryConsumed !== false) {
+    // [OK] devolver item al inventario (si no es el verde base)
+    if (this.economy && b.typeKey && b.typeKey !== "green_1") {
       this.economy.addItem?.(b.typeKey, 1);
     }
 
     b.gfx.destroy();
     b.sprite?.destroy();
-    b.roadSprite?.destroy();
     b.buildBar?.destroy();
     b.prodBar?.destroy();
     b.glowGfx?.destroy();
@@ -6127,12 +5243,9 @@ class MainScene extends Phaser.Scene {
     // validar espacio
     if (!this.canPlaceBuildAt(typeKey, size, r0, c0)) return;
 
-    const forcedRoadPiece = (typeKey === "road_main_2x2") ? this.getAdminForcedRoadPiece() : 0;
-    const isTempAdminRoadPlacement = (typeKey === "road_main_2x2" && forcedRoadPiece > 0);
-
     // [OK] si no es el verde basico, debe existir en inventario y se consume
-    // excepto en el modo temporal de piezas de carretera del admin.
-    if (this.economy && typeKey !== "green_1" && !isTempAdminRoadPlacement) {
+    // (si quieres que verde tambien consuma, lo cambiamos luego)
+    if (this.economy && typeKey !== "green_1") {
       const ok = this.economy.consumeItem(typeKey, 1);
       if (!ok) {
         console.log("No tienes ese item en inventario:", typeKey);
@@ -6245,10 +5358,6 @@ class MainScene extends Phaser.Scene {
       cells,
       gfx,
       sprite,
-      roadSprite: null,
-      roadSpriteImg: null,
-      roadResolvedPiece: 0,
-      roadResolvedRot: 0,
       buildBar,
       prodBar,
       rewardGoldIcon,
@@ -6275,8 +5384,6 @@ class MainScene extends Phaser.Scene {
       lastRewardAt: 0,
       border: def.border,
       rotationStep: previewRotationStep,
-      roadForcedPiece: (typeKey === "road_main_2x2") ? forcedRoadPiece : 0,
-      inventoryConsumed: (typeKey !== "green_1") && !isTempAdminRoadPlacement,
       residentNpcSpawned: false,
       constructAnimActive: false,
       constructAnimUntil: 0
@@ -6284,7 +5391,7 @@ class MainScene extends Phaser.Scene {
 
     const b = buildings.get(id);
     if (b) this.applyEvolution(b, now);
-    if (b?.typeKey === "road_main_2x2") {
+    if (b?.typeKey === "road_2") {
       this.normalizeRoadBuildingState(b, false);
       this.redrawRoadBuildingVisual(b, 0.85);
       this.refreshRoadVisualsAroundCells(b.cells, 1);
@@ -6343,7 +5450,7 @@ class MainScene extends Phaser.Scene {
     const pistaColor = 0x6b7280;  // pista gris
     const negro = 0x0b0b0b;       // borde negro
 
-    // Esperado para road_main_2x2: bloque 2x2.
+    // Esperado para road_2: bloque 2x2.
     const r0 = Math.min(...cells.map((c) => c.r));
     const c0 = Math.min(...cells.map((c) => c.c));
 
@@ -6398,7 +5505,7 @@ class MainScene extends Phaser.Scene {
     if (!south) drawEdge(bottom, left);
     if (!west) drawEdge(left, top);
 
-    // 3) Conectores de pista (I/L/T/X automáticos por vecinos de bloque 2x2).
+    // 3) Conectores de pista (I/L/T/X automÃ¡ticos por vecinos de bloque 2x2).
     const toNorth = { x: (top.x + right.x) / 2, y: (top.y + right.y) / 2 };
     const toEast = { x: (right.x + bottom.x) / 2, y: (right.y + bottom.y) / 2 };
     const toSouth = { x: (bottom.x + left.x) / 2, y: (bottom.y + left.y) / 2 };
@@ -6470,7 +5577,7 @@ class MainScene extends Phaser.Scene {
       drawPoly(seamCoverAt(to, innerHalf + 0.2, seamCoverLen), pistaColor);
     }
 
-    // Núcleo central recto (diamante), también sin círculos.
+    // NÃºcleo central recto (diamante), tambiÃ©n sin cÃ­rculos.
     const cOuter = [
       { x: center.x, y: center.y - (TILE_H * 0.34) },
       { x: center.x + (TILE_W * 0.34), y: center.y },
@@ -6488,18 +5595,12 @@ class MainScene extends Phaser.Scene {
   }
 
   redrawRoadBuildingVisual(b, alpha = 0.85) {
-    if (!b || b.typeKey !== "road_main_2x2" || !b.gfx) return;
-    const def = BUILDING_TYPES.road_main_2x2;
+    if (!b || b.typeKey !== "road_2" || !b.gfx) return;
+    const def = BUILDING_TYPES.road_2;
     this.normalizeRoadBuildingState(b, false);
-    const usedRoadKoto = this.applyRoadKotoSpriteVisual(b, alpha);
     b.gfx.clear();
-    if (usedRoadKoto) {
-      b.gfx.setVisible(false);
-      return;
-    }
     this.drawRoadCellsCompact(b.gfx, b.cells, def.fill, alpha, def.border);
     b.gfx.setVisible(true);
-    b.roadSprite?.setVisible(false);
   }
 
   drawCells(g, cells, color, alpha, borderColor = color) {
@@ -6637,8 +5738,6 @@ class MainScene extends Phaser.Scene {
     g.beginPath(); g.moveTo(vRight.x, vRight.y); g.lineTo(vBottom.x, vBottom.y); g.strokePath();
     g.beginPath(); g.moveTo(vBottom.x, vBottom.y); g.lineTo(vLeft.x, vLeft.y); g.strokePath();
     g.beginPath(); g.moveTo(vLeft.x, vLeft.y); g.lineTo(vTop.x, vTop.y); g.strokePath();
-
-    this.drawGridCodeOverlay();
   }
   updateBuildingsTimers() {
     const now = Date.now();
@@ -6950,7 +6049,6 @@ if (typeof document !== "undefined" && document.fonts?.load) {
 } else {
   bootGame();
 }
-
 
 
 

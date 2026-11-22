@@ -1,0 +1,122 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background: #0f172a;
+  color: #e5e7eb;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TOP BAR */
+.top-bar {
+  background: #020617;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* PERFIL MINI (clickable) */
+.profile-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.profile-area img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-area span {
+  font-size: 14px;
+  font-weight: bold;
+  opacity: 0.95;
+}
+
+/* BOTONES */
+button {
+  background: #22c55e;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #022c22;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.secondary {
+  background: transparent;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+}
+
+/* PANEL PERFIL (overlay) */
+.profile-panel {
+  position: fixed;
+  top: 64px;
+  left: 20px;
+  width: 260px;
+  background: #020617;
+  padding: 16px;
+  border-radius: 12px;
+  display: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border: 1px solid #1e293b;
+}
+
+.profile-panel h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+.profile-panel input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+.profile-panel input::placeholder {
+  color: #94a3b8;
+}
+
+.profile-panel button {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+/* MAIN */
+main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* CANVAS */
+canvas {
+  background: #020617;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px #1e293b;
+}
