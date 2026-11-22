@@ -1,0 +1,258 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  background: #0c182d;
+  color: #e8f3ff;
+}
+
+.iso3d-app {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.iso3d-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #233c5f;
+  background: #10203a;
+}
+
+.iso3d-title-wrap {
+  min-width: 0;
+}
+
+.iso3d-title {
+  margin: 0;
+  font-size: 17px;
+  color: #f7fbff;
+}
+
+.iso3d-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #b5cbe8;
+}
+
+.iso3d-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iso3d-link-btn,
+.iso3d-head-actions button,
+.iso3d-panel button {
+  border: 1px solid #33527c;
+  background: #183054;
+  color: #e9f4ff;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 9px 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.iso3d-link-btn:hover,
+.iso3d-head-actions button:hover,
+.iso3d-panel button:hover {
+  background: #24456e;
+}
+
+.iso3d-panel button:disabled,
+.iso3d-head-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
+.iso3d-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+}
+
+.iso3d-panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  border-right: 1px solid #233c5f;
+  background: #0f1d33;
+}
+
+.iso3d-panel-right {
+  border-right: 0;
+  border-left: 1px solid #233c5f;
+}
+
+.iso3d-block {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #28466e;
+  border-radius: 10px;
+  background: #132440;
+}
+
+.iso3d-block h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.iso3d-label {
+  display: block;
+  margin: 8px 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #bfd5f1;
+}
+
+.iso3d-label-inline {
+  font-size: 12px;
+  font-weight: 700;
+  color: #bfd5f1;
+}
+
+.iso3d-label-inline input {
+  display: block;
+  margin-top: 5px;
+}
+
+.iso3d-check {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #cce0f7;
+}
+
+.iso3d-help {
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: #99b8db;
+}
+
+.iso3d-range-meta {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #9fb9da;
+}
+
+.iso3d-range-meta b {
+  min-width: 44px;
+  text-align: center;
+  border: 1px solid #365887;
+  border-radius: 6px;
+  background: #10203a;
+  color: #eef6ff;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.iso3d-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.iso3d-panel input[type="number"],
+.iso3d-panel input[type="text"],
+.iso3d-panel input[type="range"],
+.iso3d-panel input[type="file"],
+.iso3d-panel select {
+  width: 100%;
+}
+
+.iso3d-panel input[type="number"],
+.iso3d-panel input[type="text"],
+.iso3d-panel select {
+  border: 1px solid #365887;
+  border-radius: 8px;
+  background: #10203a;
+  color: #eef6ff;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.iso3d-canvas-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #79b44a;
+}
+
+#iso3dCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.iso3d-hud {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: min(580px, calc(100% - 24px));
+  border: 1px solid #355b8b;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(8, 18, 34, 0.78);
+  color: #e9f5ff;
+  font-size: 12px;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.iso3d-console {
+  margin: 0;
+  min-height: 300px;
+  max-height: 65vh;
+  overflow: auto;
+  border: 1px solid #31547f;
+  border-radius: 8px;
+  background: #0a172c;
+  color: #9fe5ff;
+  padding: 9px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+@media (max-width: 1260px) {
+  .iso3d-layout {
+    grid-template-columns: 290px minmax(0, 1fr) 290px;
+  }
+}
+
+@media (max-width: 1060px) {
+  .iso3d-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .iso3d-panel {
+    border-right: 0;
+    border-bottom: 1px solid #233c5f;
+  }
+
+  .iso3d-panel-right {
+    border-left: 0;
+    border-top: 1px solid #233c5f;
+  }
+}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Editor 3D Isometrico Anclado</title>
+  <link rel="stylesheet" href="./iso_3d_anchor_editor.css?v=20260220g" />
+</head>
+<body>
+  <div class="iso3d-app">
+    <header class="iso3d-header">
+      <div class="iso3d-title-wrap">
+        <h1 class="iso3d-title">Editor 3D Isometrico Anclado</h1>
+        <p class="iso3d-subtitle">Camara 2:1 del juego + pivote por cubo base (1x1, 2x2, 4x4, 9x9).</p>
+      </div>
+      <div class="iso3d-head-actions">
+        <a class="iso3d-link-btn" href="./index.html">Volver al juego</a>
+        <button id="iso3dExportBtn" type="button">Exportar PNG (solo modelo)</button>
+        <button id="iso3dCopyBtn" type="button">Copiar config</button>
+      </div>
+    </header>
+
+    <div class="iso3d-layout">
+      <aside class="iso3d-panel">
+        <section class="iso3d-block">
+          <h2>Modelo</h2>
+          <input id="iso3dModelInput" type="file" accept=".glb,.gltf" />
+          <div class="iso3d-row">
+            <button id="iso3dLoadBtn" type="button">Cargar</button>
+            <button id="iso3dClearBtn" type="button">Quitar</button>
+          </div>
+          <label class="iso3d-label" for="iso3dScaleInput">Escala modelo</label>
+          <input id="iso3dScaleInput" type="range" min="0.05" max="8" step="0.01" value="1" />
+          <label class="iso3d-label" for="iso3dPivotInput">Mesh pivote (base principal)</label>
+          <input id="iso3dPivotInput" type="text" value="Box001" />
+          <div class="iso3d-row">
+            <button id="iso3dPickPivotBtn" type="button">Elegir pivote con click</button>
+            <button id="iso3dPivotCombinedBtn" type="button">Usar modelo completo</button>
+          </div>
+          <p class="iso3d-help">Activa el modo y haz click en una parte del modelo para usar ese mesh como centro de rotacion/anclaje.</p>
+          <label class="iso3d-check"><input id="iso3dOutlineChk" type="checkbox" checked /> Outline negro</label>
+          <label class="iso3d-label" for="iso3dOutlineWidthInput">Grosor outline</label>
+          <input id="iso3dOutlineWidthInput" type="range" min="1" max="64" step="1" value="12" />
+          <div class="iso3d-range-meta">
+            <span>1</span>
+            <b id="iso3dOutlineWidthValue">12</b>
+            <span>64</span>
+          </div>
+        </section>
+
+        <section class="iso3d-block">
+          <h2>Animacion (cuadro por cuadro)</h2>
+          <label class="iso3d-label" for="iso3dAnimSelect">Clip</label>
+          <select id="iso3dAnimSelect">
+            <option value="-1">(sin animaciones)</option>
+          </select>
+          <div class="iso3d-row">
+            <button id="iso3dAnimPlayBtn" type="button">Play</button>
+            <button id="iso3dAnimPauseBtn" type="button">Pausa</button>
+          </div>
+          <div class="iso3d-row">
+            <button id="iso3dAnimPrevBtn" type="button">Cuadro -</button>
+            <button id="iso3dAnimNextBtn" type="button">Cuadro +</button>
+          </div>
+          <div class="iso3d-row">
+            <label class="iso3d-label-inline">Cuadro <input id="iso3dAnimFrameInput" type="number" step="1" value="0" /></label>
+            <label class="iso3d-label-inline">Paso <input id="iso3dAnimStepInput" type="number" min="1" step="1" value="1" /></label>
+          </div>
+          <div class="iso3d-row">
+            <button id="iso3dAnimApplyFrameBtn" type="button">Ir a cuadro</button>
+            <button id="iso3dAnimResetBtn" type="button">Inicio clip</button>
+          </div>
+          <div id="iso3dAnimMeta" class="iso3d-help">Carga un modelo con animaciones para activar este panel.</div>
+          <p class="iso3d-help">Usa "Exportar PNG" despues de posicionarte en el cuadro deseado.</p>
+        </section>
+
+        <section class="iso3d-block">
+          <h2>Base de rotacion</h2>
+          <label class="iso3d-label" for="iso3dFootprintSelect">Tamano base</label>
+          <select id="iso3dFootprintSelect">
+            <option value="1">1x1</option>
+            <option value="2" selected>2x2</option>
+            <option value="4">4x4</option>
+            <option value="9">9x9</option>
+          </select>
+          <label class="iso3d-label" for="iso3dAnchorHeightInput">Altura cubo guia</label>
+          <input id="iso3dAnchorHeightInput" type="number" min="0.2" max="30" step="0.1" value="2" />
+          <label class="iso3d-check"><input id="iso3dShowAnchorChk" type="checkbox" checked /> Mostrar cubo base</label>
+        </section>
+
+        <section class="iso3d-block">
+          <h2>Posicion y giro</h2>
+          <div class="iso3d-row">
+            <label class="iso3d-label-inline">Tile X <input id="iso3dTileXInput" type="number" step="1" value="0" /></label>
+            <label class="iso3d-label-inline">Tile Z <input id="iso3dTileZInput" type="number" step="1" value="0" /></label>
+          </div>
+          <div class="iso3d-row">
+            <button id="iso3dRotLBtn" type="button">Girar -90</button>
+            <button id="iso3dRotRBtn" type="button">Girar +90</button>
+          </div>
+          <label class="iso3d-label" for="iso3dRotInput">Rotacion (grados)</label>
+          <input id="iso3dRotInput" type="number" step="1" value="0" />
+          <p class="iso3d-help">Click en el suelo para mover. La rotacion siempre usa el centro del cubo base.</p>
+        </section>
+
+        <section class="iso3d-block">
+          <h2>Camara Iso</h2>
+          <label class="iso3d-label" for="iso3dZoomInput">Zoom ortografico</label>
+          <input id="iso3dZoomInput" type="range" min="4" max="80" step="0.5" value="20" />
+          <div class="iso3d-row">
+            <button id="iso3dCenterCamBtn" type="button">Centrar modelo</button>
+            <button id="iso3dResetCamBtn" type="button">Reset camara</button>
+          </div>
+          <p class="iso3d-help">Camara fija juego: alpha -45, beta 60 (proyeccion 2:1).</p>
+        </section>
+      </aside>
+
+      <main class="iso3d-canvas-wrap">
+        <canvas id="iso3dCanvas"></canvas>
+        <div id="iso3dHud" class="iso3d-hud"></div>
+      </main>
+
+      <aside class="iso3d-panel iso3d-panel-right">
+        <section class="iso3d-block">
+          <h2>Estado</h2>
+          <pre id="iso3dConsole" class="iso3d-console"></pre>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  <script src="./iso_3d_anchor_editor.js?v=20260220g"></script>
+</body>
+</html>

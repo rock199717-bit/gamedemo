@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Editor Cubo Isometrico</title>
+  <link rel="stylesheet" href="./iso_cube_painter.css" />
+</head>
+<body>
+  <div class="iso-app">
+    <header class="iso-header">
+      <div class="iso-title-wrap">
+        <h1 class="iso-title">Editor 2D sobre Cubo 3D Isometrico</h1>
+        <p class="iso-subtitle">Pinta por caras (Top/Left/Right) y exporta PNG para tu gameplay isometrico.</p>
+      </div>
+      <div class="iso-header-actions">
+        <a class="iso-link-btn" href="./index.html">Volver al juego</a>
+        <button id="isoExportBtn" type="button">Exportar PNG</button>
+      </div>
+    </header>
+
+    <div class="iso-layout">
+      <aside class="iso-panel">
+        <section class="iso-block">
+          <h2>Documento</h2>
+          <label class="iso-label" for="isoFootprintSelect">Base (lote)</label>
+          <select id="isoFootprintSelect">
+            <option value="1">1x1</option>
+            <option value="2" selected>2x2</option>
+            <option value="4">4x4</option>
+            <option value="9">9x9</option>
+          </select>
+
+          <label class="iso-label" for="isoHeightInput">Altura (tiles)</label>
+          <input id="isoHeightInput" type="number" min="1" max="24" step="1" value="2" />
+
+          <div class="iso-row">
+            <button id="isoApplySizeBtn" type="button">Aplicar tamano</button>
+            <button id="isoNewDocBtn" type="button">Nuevo</button>
+          </div>
+        </section>
+
+        <section class="iso-block">
+          <h2>Herramientas</h2>
+          <div class="iso-row-wrap">
+            <button class="iso-tool-btn is-active" data-tool="brush" type="button">Pincel (B)</button>
+            <button class="iso-tool-btn" data-tool="eraser" type="button">Borrador (E)</button>
+            <button class="iso-tool-btn" data-tool="fill" type="button">Relleno (G)</button>
+            <button class="iso-tool-btn" data-tool="picker" type="button">Gotero (I)</button>
+            <button class="iso-tool-btn" data-tool="pan" type="button">Mover vista (H)</button>
+          </div>
+
+          <label class="iso-label" for="isoBrushColor">Color</label>
+          <input id="isoBrushColor" type="color" value="#5b6579" />
+
+          <label class="iso-label" for="isoBrushSize">Tamano pincel</label>
+          <input id="isoBrushSize" type="range" min="1" max="96" step="1" value="12" />
+
+          <label class="iso-label" for="isoBrushOpacity">Opacidad pincel</label>
+          <input id="isoBrushOpacity" type="range" min="0.01" max="1" step="0.01" value="1" />
+
+          <label class="iso-label" for="isoFaceModeSelect">Cara editable</label>
+          <select id="isoFaceModeSelect">
+            <option value="auto" selected>Auto (la que toques)</option>
+            <option value="top">Top</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+        </section>
+
+        <section class="iso-block">
+          <h2>Capas</h2>
+          <div id="isoLayerList" class="iso-layer-list"></div>
+          <div class="iso-row-wrap">
+            <button id="isoLayerAddBtn" type="button">+ Capa</button>
+            <button id="isoLayerDupBtn" type="button">Duplicar</button>
+            <button id="isoLayerDelBtn" type="button">Eliminar</button>
+            <button id="isoLayerUpBtn" type="button">Subir</button>
+            <button id="isoLayerDownBtn" type="button">Bajar</button>
+          </div>
+
+          <label class="iso-label" for="isoLayerNameInput">Nombre capa activa</label>
+          <input id="isoLayerNameInput" type="text" value="" maxlength="42" />
+
+          <label class="iso-label" for="isoLayerOpacity">Opacidad capa activa</label>
+          <input id="isoLayerOpacity" type="range" min="0" max="1" step="0.01" value="1" />
+        </section>
+
+        <section class="iso-block">
+          <h2>Importar / Limpiar</h2>
+          <label class="iso-label" for="isoImportFaceSelect">Importar PNG en cara</label>
+          <select id="isoImportFaceSelect">
+            <option value="top">Top</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+          <input id="isoImportFaceInput" type="file" accept="image/png" />
+
+          <div class="iso-row">
+            <button id="isoClearFaceBtn" type="button">Limpiar cara</button>
+            <button id="isoClearLayerBtn" type="button">Limpiar capa</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="iso-canvas-wrap">
+        <canvas id="isoPainterCanvas"></canvas>
+        <div id="isoHud" class="iso-hud"></div>
+      </main>
+
+      <aside class="iso-panel iso-panel-right">
+        <section class="iso-block">
+          <h2>Navegacion</h2>
+          <ul class="iso-help-list">
+            <li>Rueda: zoom</li>
+            <li>Espacio + arrastre: mover vista</li>
+            <li>Ctrl + Z / Ctrl + Shift + Z: undo / redo</li>
+            <li>B / E / G / I / H: cambiar herramienta</li>
+          </ul>
+        </section>
+
+        <section class="iso-block">
+          <h2>Estado</h2>
+          <pre id="isoStateConsole" class="iso-console"></pre>
+          <button id="isoCopyStateBtn" type="button">Copiar estado</button>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script src="./iso_cube_painter.js"></script>
+</body>
+</html>

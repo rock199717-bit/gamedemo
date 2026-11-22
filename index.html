@@ -1,4 +1,4 @@
-﻿<!doctype html>
+-/x<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -8,14 +8,142 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./economy.css">
+  <link rel="stylesheet" href="./economy.css?v=20260227a">
 </head>
 <body>
   <div id="game"></div>
+  <button id="pngEditorToggleBtn" type="button">Modo Editor PNG</button>
+  <a id="isoCubePainterOpenBtn" href="./iso_cube_painter.html" target="_blank" rel="noopener">Editor Cubo Iso</a>
+  <a id="iso3dAnchorOpenBtn" href="./iso_3d_anchor_editor.html?v=20260220g" target="_blank" rel="noopener">Editor 3D Iso</a>
+
+  <section id="pngEditorOverlay" class="png-editor-overlay" hidden>
+    <div class="png-editor-shell">
+      <div class="png-editor-header">
+        <div class="png-editor-title">Editor PNG Pixel Perfect</div>
+        <button id="pngEditorCloseBtn" class="png-editor-close" type="button">Volver al juego</button>
+      </div>
+
+      <div class="png-editor-main">
+        <div class="png-editor-workspace-wrap">
+          <div id="pngEditorWorkspace" class="png-editor-workspace">
+            <canvas id="pngEditorIsoGridCanvas" class="png-editor-grid"></canvas>
+            <canvas id="pngEditorGhostCanvas" class="png-editor-ghost-layer"></canvas>
+            <img id="pngEditorImage" class="png-editor-image" alt="PNG en edicion" draggable="false" />
+            <div id="pngEditorHandleLayer" class="png-editor-handle-layer"></div>
+          </div>
+        </div>
+
+        <aside class="png-editor-panel">
+          <div class="png-editor-group">
+            <label class="png-e9ditor-label" for="pngEditorBuildingSelect">Casa colocada en juego</label>
+            <div class="png-editor-row png-editor-row-select">
+              <select id="pngEditorBuildingSelect">
+                <option value="">-- Sin seleccionar --</option>
+              </select>
+              <button id="pngEditorRefreshBuildingsBtn" type="button">Refrescar</button>
+            </div>
+            <div class="png-editor-group-inline">
+              <button id="pngEditorLoadBuildingBtn" type="button">Cargar Casa</button>
+              <button id="pngEditorResetBuildingBtn" type="button">Reset Casa</button>
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label" for="pngEditorFileInput">PNG</label>
+            <input id="pngEditorFileInput" type="file" accept="image/png" />
+          </div>
+
+          <div class="png-editor-group png-editor-group-inline">
+            <button id="pngEditorCenterBtn" type="button">Centrar</button>
+            <button id="pngEditorResetBtn" type="button">Reset</button>
+            <button id="pngEditorCopyBtn" type="button">Copiar Codigo</button>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label" for="pngEditorZoomRange">Zoom Editor</label>
+            <div class="png-editor-row">
+              <input id="pngEditorZoomRange" type="range" min="0.25" max="8" step="0.01" value="1" />
+              <input id="pngEditorZoomInput" type="number" min="0.25" max="8" step="0.01" value="1" />
+            </div>
+            <div class="png-editor-mini-help">Rueda del mouse en el lienzo para zoom. `Ctrl + arrastrar` = transformacion libre.</div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label">Ghost Medida (lote)</label>
+            <div class="png-editor-group-inline">
+              <button id="pngEditorGhostOffBtn" type="button">Ghost OFF</button>
+              <button id="pngEditorGhost1Btn" type="button">1x1</button>
+              <button id="pngEditorGhost2Btn" type="button">2x2</button>
+              <button id="pngEditorGhost4Btn" type="button">4x4</button>
+              <button id="pngEditorGhost9Btn" type="button">9x9</button>
+              <button id="pngEditorFitGhostBtn" type="button">Encajar PNG</button>
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label" for="pngEditorRotRange">Rotacion</label>
+            <div class="png-editor-row">
+              <input id="pngEditorRotRange" type="range" min="-180" max="180" step="0.1" value="0" />
+              <input id="pngEditorRotInput" type="number" step="0.1" value="0" />
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <div class="png-editor-row png-editor-row-between">
+              <label class="png-editor-label">Escala X/Y</label>
+              <label class="png-editor-check"><input id="pngEditorLockScale" type="checkbox" checked /> Bloquear</label>
+            </div>
+            <div class="png-editor-row">
+              <input id="pngEditorScaleXRange" type="range" min="0.05" max="8" step="0.01" value="1" />
+              <input id="pngEditorScaleXInput" type="number" step="0.01" value="1" />
+            </div>
+            <div class="png-editor-row">
+              <input id="pngEditorScaleYRange" type="range" min="0.05" max="8" step="0.01" value="1" />
+              <input id="pngEditorScaleYInput" type="number" step="0.01" value="1" />
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label">Distorsion (Skew)</label>
+            <div class="png-editor-row">
+              <input id="pngEditorSkewXRange" type="range" min="-89" max="89" step="0.1" value="0" />
+              <input id="pngEditorSkewXInput" type="number" step="0.1" value="0" />
+            </div>
+            <div class="png-editor-row">
+              <input id="pngEditorSkewYRange" type="range" min="-89" max="89" step="0.1" value="0" />
+              <input id="pngEditorSkewYInput" type="number" step="0.1" value="0" />
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label">Posicion (arrastrar o escribir)</label>
+            <div class="png-editor-row">
+              <input id="pngEditorXInput" type="number" step="1" value="0" />
+              <input id="pngEditorYInput" type="number" step="1" value="0" />
+            </div>
+          </div>
+
+          <div class="png-editor-group">
+            <label class="png-editor-label" for="pngEditorOpacityRange">Opacidad</label>
+            <div class="png-editor-row">
+              <input id="pngEditorOpacityRange" type="range" min="0.05" max="1" step="0.01" value="1" />
+              <input id="pngEditorOpacityInput" type="number" min="0.05" max="1" step="0.01" value="1" />
+            </div>
+          </div>
+
+          <div id="pngEditorInfo" class="png-editor-info">Carga un PNG para empezar.</div>
+          <pre id="pngEditorConsole" class="png-editor-console"></pre>
+        </aside>
+      </div>
+    </div>
+  </section>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-  <script src="./economy.js"></script>
-  <script src="./main.js"></script>
+  <script src="./economy.js?v=20260227a"></script>
+  <script src="./npc_ui.js?v=20260303a"></script>
+  <script src="./main.js?v=20260227a"></script>
+  <script src="./npc_house_ui.js?v=20260310a"></script>
+  <script src="./png_editor.js"></script>
 </body>
 <!-- ===== GACHA MODAL (UI encima del juego) ===== -->
 <div id="gachaModal" class="gacha-modal" style="display:none;">
@@ -55,4 +183,3 @@
 </div>
 
 </html>
-

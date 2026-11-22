@@ -105,6 +105,36 @@
 }
 .inv-btn:hover{ filter: brightness(1.05); }
 
+.road-inv-btn{
+  position: fixed;
+  right: 16px;
+  bottom: 112px;
+  z-index: 999999;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e5e7eb;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.road-inv-btn:hover{ filter: brightness(1.05); }
+
+.npc-inv-btn{
+  position: fixed;
+  right: 16px;
+  bottom: 160px;
+  z-index: 999999;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e5e7eb;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.npc-inv-btn:hover{ filter: brightness(1.05); }
+
 .admin-btn{
   position: fixed;
   right: 16px;
@@ -153,6 +183,139 @@
   border-color: rgba(139,92,246,.55);
 }
 
+.admin-card{
+  width: min(720px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.admin-weather-panel{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148,163,184,.18);
+}
+
+.admin-weather-body{
+  display: grid;
+  gap: 8px;
+}
+
+.admin-weather-tools{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.admin-weather-group{
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(148,163,184,.2);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, .28);
+}
+
+.admin-weather-group-title{
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.admin-weather-grid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-weather-btn{
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e2e8f0;
+  border-radius: 9px;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-weather-btn:hover{
+  filter: brightness(1.08);
+}
+
+.admin-weather-btn.is-active{
+  border-color: rgba(45,212,191,.75);
+  box-shadow: 0 0 0 1px rgba(45,212,191,.25) inset;
+  color: #99f6e4;
+}
+
+.admin-weather-btn.admin-weather-btn-small{
+  padding: 6px 7px;
+  font-size: 11px;
+}
+
+.admin-weather-btn.admin-weather-btn-event{
+  border-color: rgba(244,114,182,.45);
+}
+
+.admin-road-panel{
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148,163,184,.18);
+}
+
+.admin-road-head{
+  display: grid;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.admin-road-title{
+  font-size: 13px;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+.admin-road-sub{
+  font-size: 11px;
+  opacity: .8;
+}
+
+.admin-road-list{
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.admin-road-btn{
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 7px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-road-btn:hover{
+  filter: brightness(1.08);
+}
+
+.admin-road-btn.is-active{
+  border-color: rgba(245,158,11,.8);
+  box-shadow: 0 0 0 1px rgba(245,158,11,.3) inset;
+  color: #fde68a;
+}
+
+.admin-road-btn.admin-road-auto{
+  border-color: rgba(45,212,191,.6);
+  color: #99f6e4;
+}
+
 /* ===== YAPA RAIL (lado izquierdo, estilo city-like) ===== */
 .yapa-rail{
   position: absolute;
@@ -186,6 +349,33 @@
 }
 
 .yapa-btn-art{
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: none;
+}
+
+.store-btn{
+  pointer-events: auto;
+  margin-top: 6px;
+  width: 84px;
+  height: 84px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  cursor: pointer;
+  padding: 0;
+  display: block;
+  overflow: visible;
+}
+
+.store-btn:hover{ filter: brightness(1.05); }
+.store-btn:active{ transform: translateY(1px); }
+
+.store-btn-art{
   display: block;
   width: 100%;
   height: 100%;
@@ -271,6 +461,125 @@
   color: #f8fafc;
   box-shadow: 0 22px 56px rgba(0,0,0,.46);
   padding: 14px;
+}
+
+.gold-store-card{
+  width: min(980px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.gold-store-topline{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.gold-store-hint{
+  color: #93c5fd;
+  font-size: 12px;
+  opacity: .95;
+}
+
+.gold-store-tabs{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.gold-store-tab{
+  border: 1px solid rgba(148,163,184,.35);
+  background: #0b1222;
+  color: #e5e7eb;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gold-store-tab.is-active{
+  border-color: rgba(245,158,11,.75);
+  box-shadow: 0 0 0 1px rgba(245,158,11,.35) inset;
+  color: #fde68a;
+}
+
+.gold-store-list{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.gold-store-item{
+  border: 1px solid rgba(148,163,184,.28);
+  background: rgba(15,23,42,.8);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.gold-store-item-name{
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.gold-store-item-meta{
+  margin-top: 4px;
+  font-size: 12px;
+  color: #93c5fd;
+}
+
+.gold-store-item-side{
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.gold-store-price{
+  font-size: 13px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.gold-store-qty{
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.gold-store-buy-btn{
+  border: 0;
+  border-radius: 10px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 7px 10px;
+}
+
+.gold-store-buy-btn:disabled{
+  cursor: not-allowed;
+  background: #334155;
+  color: #cbd5e1;
+}
+
+.gold-store-empty{
+  border: 1px dashed rgba(148,163,184,.35);
+  border-radius: 12px;
+  background: rgba(15,23,42,.62);
+  color: #cbd5e1;
+  padding: 16px;
+  text-align: center;
 }
 
 .yapa-head{
@@ -1248,11 +1557,155 @@
 .inv-count{ font-weight: 700; }
 .inv-hint{ opacity:.75; display:block; margin-top:10px; }
 
+.road-inv-card{
+  width: min(920px, 95vw);
+}
+
+.npc-inv-card{
+  width: min(760px, 95vw);
+}
+
+.npc-inv-list{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 480px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.npc-inv-item{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(148,163,184,.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(2,6,23,.42);
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+}
+
+.npc-inv-icon{
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  border: 2px solid rgba(192,132,252,.4);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 900;
+  flex: 0 0 auto;
+}
+
+.npc-inv-meta{
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.npc-inv-name{
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.npc-inv-sub{
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.npc-inv-open{
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--npc-card-accent, #c084fc);
+}
+
+.road-inv-head{
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.road-inv-head small{
+  opacity: .75;
+  font-size: 11px;
+}
+
+.road-inv-list{
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.road-inv-item{
+  border: 1px solid rgba(148,163,184,.2);
+  border-radius: 12px;
+  background: rgba(2,6,23,.4);
+  color: #e5e7eb;
+  padding: 8px;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.road-inv-item.is-empty{
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.road-inv-thumb-wrap{
+  width: 100%;
+  max-width: 124px;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: #0f172a;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.road-inv-thumb{
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.road-inv-thumb-canvas{
+  image-rendering: auto;
+  filter: drop-shadow(0 3px 2px rgba(0,0,0,.25));
+}
+
+.road-inv-code{
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.road-inv-count{
+  font-size: 12px;
+  opacity: .9;
+  font-weight: 700;
+}
+
 /* móvil horizontal */
 @media (max-width: 900px) and (orientation: landscape) {
   .yapa-rail { top: 128px; left: 8px; }
   .yapa-btn { width: 72px; height: 72px; padding: 0; }
   .yapa-btn-art { width: 100%; height: 100%; }
+  .store-btn { width: 72px; height: 72px; margin-top: 6px; padding: 0; }
+  .store-btn-art { width: 100%; height: 100%; }
   .yapa-btn-mark { width: 24px; height: 20px; font-size: 9px; border-radius: 10px; }
   .yapa-btn-mark::after { content: none; }
   .yapa-btn-logo { font-size: 12px; margin-top: 0; }
@@ -1280,7 +1733,14 @@
   .gacha-banner { padding: 10px; }
   .gacha-log { min-height: 36px; }
   .inv-card { width: min(520px, 96vw); padding: 10px; }
+  .npc-inv-card { width: min(96vw, 760px); }
+  .npc-inv-list { grid-template-columns: 1fr; }
   .inv-title { font-size: 16px; }
+  .admin-card { width: min(96vw, 720px); }
+  .admin-weather-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-road-list { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .road-inv-card { width: min(96vw, 920px); }
+  .road-inv-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   /* Gacha HTML modal (creado en JS) */
   #gacha-modal .gacha-window {
     width: 96vw !important;
